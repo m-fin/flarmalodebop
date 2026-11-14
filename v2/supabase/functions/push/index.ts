@@ -37,6 +37,9 @@ Deno.serve(async (req) => {
     if (act && Date.now() - new Date(act.active_at).getTime() < 40_000) continue;
     const { data: subs } = await sb.from("push_subscriptions").select("endpoint, sub").eq("user_id", o.id);
     for (const s of subs ?? []) {
+      const sub = s.sub as { endpoint?: string; type?: string };
+      // Native tokens live in the same table and are delivered by the expo-push function.
+      if (sub?.type === "expo" || !sub?.endpoint) continue;
       try {
         await webpush.sendNotification(s.sub, JSON.stringify({ title: sender?.display ?? "Flarmalodebop", body, tag: "flarm-msg" }), { TTL: 3600 });
         sent++;
