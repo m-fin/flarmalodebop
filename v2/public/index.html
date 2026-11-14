@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="robots" content="noindex, nofollow">
+<title>Flarmalodebop</title>
+<meta name="theme-color" content="#2a1240">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Flarmalodebop">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icons/icon-180.png">
+<link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152.png">
+<link rel="apple-touch-icon" sizes="167x167" href="/icons/icon-167.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png">
+<link rel="icon" href="/icons/icon-32.png">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div id="bg" aria-hidden="true"><div class="staff"></div><span class="fl n1">♪</span><span class="fl n2">♫</span><span class="fl n3">♩</span><span class="fl n4">♬</span><span class="fl n5">♪</span></div>
+
+<!-- Login -->
+<section id="setup" class="screen hidden"><div class="setup-note"><h1 class="logo">Flarmalodebop</h1><p>Almost ready — this copy isn’t connected to its server yet.<br>Fill in <code>config.js</code>.</p></div></section>
+
+<section id="login" class="screen hidden">
+  <div class="login-card">
+    <img src="/icons/icon-192.png" alt="" class="login-icon">
+    <h1 class="logo">Flarmalodebop</h1>
+    <p class="tag">a tiny private place for two ♪</p>
+    <form id="loginForm" autocomplete="on">
+      <div class="who">
+        <label><input type="radio" name="username" value="frog" checked><span>🐸 Frog</span></label>
+        <label><input type="radio" name="username" value="hailey"><span>🌸 Hailey</span></label>
+      </div>
+      <input id="pw" type="password" name="password" placeholder="secret password" autocomplete="current-password" required>
+      <button type="submit" class="btn-primary">Let's bop</button>
+      <p id="loginErr" class="err" role="alert"></p>
+    </form>
+  </div>
+</section>
+
+<!-- Chat -->
+<section id="chat" class="screen hidden">
+  <header class="top">
+    <div class="avatar" id="otherAvatar">H</div>
+    <div class="who-box">
+      <div class="other-name" id="otherName">Hailey</div>
+      <div class="status" id="status"><span class="dot"></span><span id="statusText">offline</span></div>
+    </div>
+    <button class="icon-btn" id="menuBtn" aria-label="Settings">⋯</button>
+  </header>
+
+  <main id="scroller">
+    <button id="loadOlder" class="older hidden">earlier bops</button>
+    <div id="empty" class="empty hidden">
+      <div class="big">♫</div>
+      <p>This is the very first note.<br>Say something nice.</p>
+    </div>
+    <div id="list"></div>
+    <div id="typing" class="msg them typing hidden"><div class="bubble"><span>♪</span><span>♫</span><span>♪</span></div></div>
+  </main>
+
+  <footer class="composer">
+    <div id="recBar" class="rec-bar hidden">
+      <button class="icon-btn" id="recCancel" aria-label="Cancel recording">✕</button>
+      <div class="rec-viz"><span class="rec-dot"></span><canvas id="recCanvas" width="400" height="44"></canvas></div>
+      <span id="recTime">0:00</span>
+      <button class="send" id="recSend" aria-label="Send voice note">➤</button>
+    </div>
+    <div id="inputBar" class="input-bar">
+      <label class="icon-btn" aria-label="Send photo">📷<input id="photoInput" type="file" accept="image/*" hidden></label>
+      <textarea id="text" rows="1" placeholder="Write a little melody…" enterkeyhint="send"></textarea>
+      <button class="icon-btn mic" id="micBtn" aria-label="Record voice note">🎙️</button>
+      <button class="send hidden" id="sendBtn" aria-label="Send">♪</button>
+    </div>
+  </footer>
+</section>
+
+<!-- Settings sheet -->
+<div id="sheet" class="sheet hidden" role="dialog" aria-modal="true">
+  <div class="sheet-card">
+    <h2>Settings</h2>
+    <p class="muted" id="meLine"></p>
+    <button id="pushBtn" class="btn-row">🔔 Turn on notifications</button>
+    <p class="muted small" id="pushNote"></p>
+    <button id="soundBtn" class="btn-row">🎵 Bop sounds: on</button>
+    <button id="logoutBtn" class="btn-row danger">Sign out</button>
+    <button id="closeSheet" class="btn-row ghost">Close</button>
+  </div>
+</div>
+
+<div id="viewer" class="viewer hidden"><img alt=""></div>
+<script src="/config.js"></script>
+<script src="/vendor/supabase.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>
