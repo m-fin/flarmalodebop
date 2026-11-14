@@ -168,7 +168,9 @@ async function connect() {
     .on('presence', { event: 'sync' }, () => setPresence(Object.keys(room.presenceState()).includes(state.other.id)))
     .subscribe(async status => {
       if (status === 'SUBSCRIBED') { await room.track({ at: Date.now() }); catchUp(); }
-      else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') setTimeout(() => state.room === room && connect(), 3000);
+      else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        setTimeout(() => { if (state.room === room && room.state !== 'joined') connect(); }, 3000);
+      }
     });
 }
 function onIncoming(m) {
@@ -187,10 +189,22 @@ async function catchUp() {
     state.otherRead = p.last_read; renderReceipt();
   } catch {}
 }
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && state.me) { catchUp(); markRead(); heartbeat(); if (state.room) state.room.track({ at: Date.now() }); }
-});
-setInterval(() => { if (document.visibilityState === 'visible' && state.me) heartbeat(); }, 25000);
+function chatVisible() { return document.visibilityState === 'visible' && state.me; }
+function onForeground() {
+  catchUp(); markRead(); heartbeat();
+  if (state.room && state.room.state === 'joined') state.room.track({ at: Date.now() });
+  else if (state.me) connect();
+}
+document.addEventListener('visibilitychange', () => { if (chatVisible()) onForeground(); });
+window.addEventListener('focus', () => { if (chatVisible()) onForeground(); });
+window.addEventListener('online', () => { if (state.me) { connect(); catchUp(); heartbeat(); } });
+// Poll so messages and read receipts still land if the private realtime channel drops.
+setInterval(() => {
+  if (!chatVisible()) return;
+  heartbeat();
+  catchUp();
+  if (state.room && state.room.state !== 'joined') connect();
+}, 10000);
 function heartbeat() { sb.rpc('heartbeat').then(() => {}, () => {}); }
 function setPresence(on) { state.online = on; $('#status').classList.toggle('on', !!on); $('#statusText').textContent = on ? 'here now ♪' : 'away'; }
 let typingTimer;

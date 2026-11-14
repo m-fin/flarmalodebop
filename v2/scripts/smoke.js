@@ -46,11 +46,27 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, p => { gotMsg = p.new; })
     .on('broadcast', { event: 'typing' }, () => { gotTyping = true; })
     .on('presence', { event: 'sync' }, () => { presence = Object.keys(hch.presenceState()); });
-  const fch = frog.channel('flarm:room', { config: { private: true, presence: { key: F } } });
-  const sub = ch => new Promise(r => ch.subscribe(s => { if (s !== 'CLOSED') r(s); }));
+  const fch = frog.channel('flarm:room', { config: { private: true, presence: { key: F, enabled: true } } });
+  // Wait for SUBSCRIBED specifically. A transient CHANNEL_ERROR can fire before join ok
+  // (especially on the postgres_changes binding); treating any non-CLOSED status as final
+  // used to fail the join check even when presence/typing later worked.
+  let joinErr = '';
+  const sub = (ch, ms = 10000) => new Promise((resolve) => {
+    let done = false;
+    const finish = (s) => { if (!done) { done = true; clearTimeout(t); resolve(s); } };
+    const t = setTimeout(() => finish('TIMED_OUT'), ms);
+    ch.subscribe((s, err) => {
+      if (s === 'SUBSCRIBED' || s === 'TIMED_OUT') return finish(s);
+      if (s !== 'CHANNEL_ERROR') return;
+      const msg = err && (err.message || String(err));
+      if (msg) joinErr = String(msg).replace(/eyJ[\w-]+\.[\w-]+\.[\w-]+/g, '[jwt]').slice(0, 180);
+      if (msg && /Unauthorized/i.test(msg)) finish('CHANNEL_ERROR');
+    });
+  });
   const s1 = await sub(hch), s2 = await sub(fch);
-  ok(s1 === 'SUBSCRIBED' && s2 === 'SUBSCRIBED', `private realtime channel joined (${s1}/${s2})`);
-  await fch.track({ at: Date.now() }); await sleep(1500);
+  ok(s1 === 'SUBSCRIBED' && s2 === 'SUBSCRIBED', `private realtime channel joined (${s1}/${s2}${joinErr ? ': ' + joinErr : ''})`);
+  await fch.track({ at: Date.now() });
+  for (let i = 0; i < 25 && !presence.includes(F); i++) await sleep(200);
   ok(presence.includes(F), 'hailey sees frog online (presence)');
   await fch.send({ type: 'broadcast', event: 'typing', payload: { user: F, on: true } });
   const ins = await frog.from('messages').insert({ kind: 'text', body: '[smoke test — auto-deleted]' }).select().single();
