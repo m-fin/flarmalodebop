@@ -5,6 +5,8 @@ import { useAuth } from '@/auth/AuthProvider';
 import { ChatView } from '@/components/ChatView';
 import { useChat } from '@/chat/useChat';
 import { gooseEffect, type GooseKind } from '@/lib/goose';
+import { appearanceLabel } from '@/lib/thread';
+import { useAppearance } from '@/lib/theme';
 import { hapticReceive, hapticSend } from '@/lib/haptics';
 import { preparePhoto, uploadFile } from '@/lib/media';
 import { clearBadge, notificationStatus, syncPushToken, unregisterPush } from '@/lib/push';
@@ -14,6 +16,7 @@ import type { Profile } from '@/lib/types';
 
 export function LiveChat({ me, other }: { me: Profile; other: Profile }) {
   const { signOut } = useAuth();
+  const appearance = useAppearance();
   const chat = useChat(me, other);
   const [soundOn, setSoundOn] = useState(true);
   const [pushLabel, setPushLabel] = useState('Turn on notifications');
@@ -69,21 +72,33 @@ export function LiveChat({ me, other }: { me: Profile; other: Profile }) {
       me={me}
       other={other}
       messages={chat.messages}
+      reactions={chat.reactions}
       otherRead={chat.otherRead}
       online={chat.online}
       typing={chat.typing}
       hasMore={chat.hasMore}
       loading={chat.loading}
+      focused={chat.focused}
       soundOn={soundOn}
+      appearanceLabel={appearanceLabel(appearance.appearance)}
       pushLabel={pushLabel}
       pushNote={pushNote}
       pushBusy={pushBusy}
       fx={fx}
       onSendText={chat.sendText}
+      onEdit={chat.editMessage}
+      onUnsend={chat.unsend}
+      onReact={chat.toggleReaction}
+      onSearch={chat.searchMessages}
+      onFocusMessage={chat.focusMessage}
+      onShowLatest={() => {
+        chat.showLatest().catch(() => {});
+      }}
       onTyping={chat.sendTyping}
       onLoadOlder={() => {
         chat.loadOlder().catch(() => {});
       }}
+      onCycleAppearance={appearance.cycle}
       onToggleSound={() => {
         const next = !soundEnabled();
         setSoundEnabled(next).then(() => {

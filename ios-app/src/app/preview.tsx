@@ -4,11 +4,13 @@ import { Redirect } from 'expo-router';
 import { ChatView } from '@/components/ChatView';
 import { gooseEffect, type GooseKind } from '@/lib/goose';
 import { honk } from '@/lib/sounds';
-import type { Message, Profile } from '@/lib/types';
+import { localSearch, nextReactions } from '@/lib/thread';
+import type { Message, Profile, Reaction } from '@/lib/types';
 
 const me: Profile = { id: 'frog', username: 'frog', display: 'Frog', last_read: 4, created_at: '' };
 const other: Profile = { id: 'hailey', username: 'hailey', display: 'Hailey', last_read: 5, created_at: '' };
 
+const now = new Date().toISOString();
 const seed: Message[] = [
   {
     id: 1,
@@ -18,17 +20,23 @@ const seed: Message[] = [
     file_path: null,
     mime: null,
     meta: null,
-    created_at: new Date().toISOString(),
+    created_at: now,
+    reply_to: null,
+    edited_at: null,
+    reply: null,
   },
   {
     id: 2,
     sender: 'frog',
     kind: 'text',
-    body: 'honk honk',
+    body: 'saving you a lily pad',
     file_path: null,
     mime: null,
     meta: null,
-    created_at: new Date().toISOString(),
+    created_at: now,
+    reply_to: 1,
+    edited_at: now,
+    reply: { id: 1, sender: 'hailey', kind: 'text', body: 'the pond is loud today' },
   },
   {
     id: 3,
@@ -38,7 +46,10 @@ const seed: Message[] = [
     file_path: 'preview-photo',
     mime: 'image/png',
     meta: { w: 1024, h: 1024 },
-    created_at: new Date().toISOString(),
+    created_at: now,
+    reply_to: null,
+    edited_at: null,
+    reply: null,
   },
   {
     id: 4,
@@ -48,7 +59,10 @@ const seed: Message[] = [
     file_path: 'preview-voice',
     mime: 'audio/wav',
     meta: { dur: 1.2, peaks: [0.2, 0.5, 0.8, 0.4, 0.9, 0.3, 0.6, 0.7, 0.2, 0.5, 0.85, 0.4] },
-    created_at: new Date().toISOString(),
+    created_at: now,
+    reply_to: null,
+    edited_at: null,
+    reply: null,
   },
   {
     id: 5,
@@ -58,8 +72,17 @@ const seed: Message[] = [
     file_path: null,
     mime: null,
     meta: null,
-    created_at: new Date().toISOString(),
+    created_at: now,
+    reply_to: null,
+    edited_at: null,
+    reply: null,
   },
+];
+
+const seedReactions: Reaction[] = [
+  { message_id: 1, user_id: 'frog', emoji: '❤️' },
+  { message_id: 1, user_id: 'hailey', emoji: '🐸' },
+  { message_id: 5, user_id: 'hailey', emoji: '🪿' },
 ];
 
 const photo = require('../../assets/icon.png');
@@ -79,6 +102,7 @@ function localPhotoUri(): string {
 /** Local fixture for screenshots. Release builds bounce back to the real gate. */
 export default function PreviewScreen() {
   const [messages, setMessages] = useState(seed);
+  const [reactions, setReactions] = useState(seedReactions);
   const [typing, setTyping] = useState(true);
   const [fx, setFx] = useState<{ nonce: number; kind: GooseKind } | null>(null);
   useEffect(() => {
@@ -104,24 +128,21 @@ export default function PreviewScreen() {
       me={me}
       other={other}
       messages={messages}
+      reactions={reactions}
       otherRead={5}
       online
       typing={typing}
       hasMore={false}
       loading={false}
+      focused={false}
       soundOn
+      appearanceLabel="Dusk"
       pushLabel="Turn on notifications"
       pushNote="Notifications turn on in a signed-in build."
       pushBusy={false}
       fx={fx}
-      onTyping={setTyping}
-      onLoadOlder={() => {}}
-      onToggleSound={() => {}}
-      onEnablePush={() => {}}
-      onSignOut={() => {}}
-      resolvePhoto={async () => localPhotoUri()}
-      resolveAudio={async (path) => (path === 'preview-voice' ? voice : photo)}
-      onSendText={async (body) => {
+      onSendText={async (body, replyTo) => {
+        const parent = messages.find((message) => message.id === replyTo);
         const message: Message = {
           id: Date.now(),
           sender: me.id,
@@ -131,12 +152,40 @@ export default function PreviewScreen() {
           mime: null,
           meta: null,
           created_at: new Date().toISOString(),
+          reply_to: replyTo ?? null,
+          edited_at: null,
+          reply: parent ? { id: parent.id, sender: parent.sender, kind: parent.kind, body: parent.body } : null,
         };
         setMessages((prev) => [...prev, message]);
         setTyping(false);
         const effect = gooseEffect(body);
         if (effect) trigger(effect);
       }}
+      onEdit={async (id, body) => {
+        setMessages((prev) => prev.map((message) => (message.id === id ? { ...message, body, edited_at: new Date().toISOString() } : message)));
+      }}
+      onUnsend={async (message) => {
+        setMessages((prev) => prev.filter((row) => row.id !== message.id).map((row) => (row.reply_to === message.id ? { ...row, reply_to: null, reply: null } : row)));
+        setReactions((prev) => prev.filter((row) => row.message_id !== message.id));
+      }}
+      onReact={async (messageId, emoji) => {
+        setReactions((prev) => {
+          const mine = prev.filter((row) => row.message_id === messageId);
+          const next = nextReactions(mine, me.id, emoji).map((row) => ({ ...row, message_id: messageId }));
+          return [...prev.filter((row) => row.message_id !== messageId), ...next];
+        });
+      }}
+      onSearch={async (query) => localSearch(messages, query)}
+      onFocusMessage={async () => {}}
+      onShowLatest={() => {}}
+      onTyping={setTyping}
+      onLoadOlder={() => {}}
+      onCycleAppearance={() => {}}
+      onToggleSound={() => {}}
+      onEnablePush={() => {}}
+      onSignOut={() => {}}
+      resolvePhoto={async () => localPhotoUri()}
+      resolveAudio={async (path) => (path === 'preview-voice' ? voice : photo)}
       onPhoto={async () => {
         setMessages((prev) => [
           ...prev,
@@ -149,6 +198,9 @@ export default function PreviewScreen() {
             mime: 'image/png',
             meta: { w: 1024, h: 1024 },
             created_at: new Date().toISOString(),
+            reply_to: null,
+            edited_at: null,
+            reply: null,
           },
         ]);
       }}

@@ -1,13 +1,12 @@
-import { useEffect, useState, type RefObject } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Clipboard from 'expo-clipboard';
 import { formatClock, formatDay, formatDur, isEmojiOnly, messageTime } from '@/lib/format';
 import { receiptFor } from '@/lib/goose';
-import { hapticSelect } from '@/lib/haptics';
+import { groupReactions, replySnippet, resolveReply } from '@/lib/thread';
 import { palette, useTheme } from '@/lib/theme';
-import type { Message, Profile } from '@/lib/types';
+import type { Message, Profile, Reaction } from '@/lib/types';
 
 type VoiceState = {
   activeId: number | null;
@@ -19,15 +18,22 @@ type VoiceState = {
 
 type Props = {
   me: Profile;
+  other: Profile;
   messages: Message[];
+  reactions: Reaction[];
   otherRead: number;
   hasMore: boolean;
   loading: boolean;
+  focused: boolean;
+  highlightId: number | null;
   onLoadOlder: () => void;
+  onShowLatest: () => void;
   onOpenPhoto: (uri: string) => void;
+  onLongPress: (message: Message) => void;
+  onReact: (messageId: number, emoji: string) => void;
+  onJump: (id: number) => void;
   resolvePhoto: (path: string) => Promise<string>;
   voice: VoiceState;
-  onToast: (text: string) => void;
   listRef: RefObject<FlatList<Message> | null>;
   onStick: (stick: boolean) => void;
 };
@@ -39,6 +45,7 @@ export function MessageList(props: Props) {
     <FlatList
       ref={props.listRef}
       data={props.messages}
+      extraData={{ reactions: props.reactions, highlightId: props.highlightId, otherRead: props.otherRead }}
       keyExtractor={(item) => String(item.id)}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
@@ -50,8 +57,16 @@ export function MessageList(props: Props) {
         props.onStick(contentSize.height - layoutMeasurement.height - contentOffset.y < 160);
       }}
       scrollEventThrottle={16}
+      onScrollToIndexFailed={(info) => {
+        props.listRef.current?.scrollToOffset({ offset: Math.max(0, info.averageItemLength * info.index), animated: false });
+        setTimeout(() => props.listRef.current?.scrollToIndex({ index: info.index, viewPosition: 0.45 }), 60);
+      }}
       ListHeaderComponent={
-        props.hasMore ? (
+        props.focused ? (
+          <Pressable onPress={props.onShowLatest} style={[styles.older, { backgroundColor: theme.card }]}>
+            <Text style={[styles.olderText, { color: theme.text }]}>back to latest</Text>
+          </Pressable>
+        ) : props.hasMore ? (
           <Pressable onPress={props.onLoadOlder} style={[styles.older, { backgroundColor: theme.card }]}>
             <Text style={[styles.olderText, { color: theme.text }]}>earlier bops</Text>
           </Pressable>
@@ -77,10 +92,23 @@ export function MessageList(props: Props) {
               mine={item.sender === props.me.id}
               gap={gap}
               receipt={receipt?.messageId === item.id ? receipt.label : null}
+              reactions={props.reactions.filter((row) => row.message_id === item.id)}
+              reply={resolveReply(item, props.messages)}
+              replyName={(() => {
+                const snap = resolveReply(item, props.messages);
+                if (!snap) return item.reply_to ? 'Earlier' : '';
+                if (snap.sender === props.me.id) return props.me.display;
+                if (snap.sender === props.other.id) return props.other.display;
+                return 'Them';
+              })()}
+              meId={props.me.id}
+              highlight={props.highlightId === item.id}
               onOpenPhoto={props.onOpenPhoto}
+              onLongPress={() => props.onLongPress(item)}
+              onReact={(emoji) => props.onReact(item.id, emoji)}
+              onJump={props.onJump}
               resolvePhoto={props.resolvePhoto}
               voice={props.voice}
-              onToast={props.onToast}
             />
           </View>
         );
@@ -94,24 +122,51 @@ function Bubble({
   mine,
   gap,
   receipt,
+  reactions,
+  reply,
+  replyName,
+  meId,
+  highlight,
   onOpenPhoto,
+  onLongPress,
+  onReact,
+  onJump,
   resolvePhoto,
   voice,
-  onToast,
 }: {
   message: Message;
   mine: boolean;
   gap: boolean;
   receipt: string | null;
+  reactions: Reaction[];
+  reply: ReturnType<typeof resolveReply>;
+  replyName: string;
+  meId: string;
+  highlight: boolean;
   onOpenPhoto: (uri: string) => void;
+  onLongPress: () => void;
+  onReact: (emoji: string) => void;
+  onJump: (id: number) => void;
   resolvePhoto: (path: string) => Promise<string>;
   voice: VoiceState;
-  onToast: (text: string) => void;
 }) {
   const theme = useTheme();
-  const emoji = message.kind === 'text' && isEmojiOnly(message.body);
+  const lastTap = useRef(0);
+  const emoji = message.kind === 'text' && isEmojiOnly(message.body) && !reply;
+  const chips = groupReactions(reactions, meId);
   const body = (
     <View style={emoji ? styles.emojiWrap : undefined}>
+      {reply || message.reply_to ? (
+        <Pressable
+          onPress={() => message.reply_to && onJump(message.reply_to)}
+          style={[styles.quote, { backgroundColor: mine ? 'rgba(0,0,0,0.14)' : 'rgba(42,18,64,0.06)', borderLeftColor: mine ? palette.sun : palette.pink }]}
+        >
+          <Text style={[styles.quoteName, { color: mine ? palette.sun : palette.pink }]}>{replyName || 'Earlier'}</Text>
+          <Text style={[styles.quoteText, { color: mine ? '#fff' : theme.themText }]} numberOfLines={1}>
+            {replySnippet(reply)}
+          </Text>
+        </Pressable>
+      ) : null}
       {message.kind === 'text' ? (
         <Text style={[styles.body, emoji && styles.emoji, !emoji && { color: mine ? '#fff' : theme.themText }]}>{message.body}</Text>
       ) : null}
@@ -124,17 +179,18 @@ function Bubble({
 
   return (
     <Pressable
-      onLongPress={
-        message.kind === 'text'
-          ? () => {
-              Clipboard.setStringAsync(message.body).then(() => {
-                hapticSelect();
-                onToast('Copied');
-              });
-            }
-          : undefined
-      }
-      style={[styles.row, mine ? styles.mine : styles.theirs, gap && styles.gap]}
+      onLongPress={onLongPress}
+      delayLongPress={360}
+      onPress={() => {
+        const now = Date.now();
+        if (now - lastTap.current < 280) {
+          lastTap.current = 0;
+          onReact('❤️');
+          return;
+        }
+        lastTap.current = now;
+      }}
+      style={[styles.row, mine ? styles.mine : styles.theirs, gap && styles.gap, highlight && styles.highlight]}
     >
       {emoji ? (
         body
@@ -147,8 +203,18 @@ function Bubble({
       )}
       <View style={styles.meta}>
         <Text style={[styles.time, { color: theme.muted }]}>{formatClock(message.created_at)}</Text>
+        {message.edited_at ? <Text style={[styles.edited, { color: theme.muted }]}>edited</Text> : null}
         {receipt ? <Text style={styles.receipt}>{receipt}</Text> : null}
       </View>
+      {chips.length ? (
+        <View style={styles.chips}>
+          {chips.map((chip) => (
+            <Pressable key={chip.emoji} onPress={() => onReact(chip.emoji)} style={[styles.chip, { backgroundColor: theme.card }, chip.mine && styles.chipMine]}>
+              <Text style={[styles.chipText, { color: theme.text }]}>{chip.count > 1 ? `${chip.emoji} ${chip.count}` : chip.emoji}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
     </Pressable>
   );
 }
@@ -245,6 +311,15 @@ const styles = StyleSheet.create({
   meta: { flexDirection: 'row', gap: 6, marginTop: 3, marginHorizontal: 8 },
   time: { fontFamily: 'Fredoka_400Regular', fontSize: 11 },
   receipt: { fontFamily: 'Fredoka_600SemiBold', fontSize: 11, color: palette.sun },
+  edited: { fontFamily: 'Fredoka_400Regular', fontSize: 11, fontStyle: 'italic' },
+  quote: { borderLeftWidth: 3, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 6, marginBottom: 6 },
+  quoteName: { fontFamily: 'Fredoka_700Bold', fontSize: 12 },
+  quoteText: { fontFamily: 'Fredoka_500Medium', fontSize: 13 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4, marginHorizontal: 8 },
+  chip: { borderRadius: 99, paddingHorizontal: 8, paddingVertical: 2 },
+  chipMine: { borderWidth: 1.5, borderColor: palette.pink },
+  chipText: { fontSize: 14 },
+  highlight: { opacity: 1 },
   caption: { fontFamily: 'Fredoka_500Medium', color: '#fff', paddingTop: 6 },
   voice: { flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 210 },
   play: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },

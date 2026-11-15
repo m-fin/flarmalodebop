@@ -23,16 +23,20 @@ import {
   type AudioSource,
 } from 'expo-audio';
 import { BlurView } from 'expo-blur';
+import * as Clipboard from 'expo-clipboard';
 import { avatarFor } from '@/lib/config';
 import { downsamplePeaks, formatDur, meterLevel } from '@/lib/format';
 import { hapticSelect, hapticTap } from '@/lib/haptics';
 import { sessionMode } from '@/lib/sounds';
+import { replySnippet } from '@/lib/thread';
 import { palette, useTheme } from '@/lib/theme';
-import type { Message, Profile } from '@/lib/types';
+import type { Message, Profile, Reaction } from '@/lib/types';
 import { Background } from '@/components/Background';
 import { GooseFx } from '@/components/GooseFx';
+import { MessageActions } from '@/components/MessageActions';
 import { MessageList } from '@/components/MessageList';
 import { PhotoViewer } from '@/components/PhotoViewer';
+import { SearchSheet } from '@/components/SearchSheet';
 import { SettingsSheet } from '@/components/SettingsSheet';
 import type { GooseKind } from '@/lib/goose';
 
@@ -50,22 +54,32 @@ type Props = {
   me: Profile;
   other: Profile;
   messages: Message[];
+  reactions: Reaction[];
   otherRead: number;
   online: boolean;
   typing: boolean;
   hasMore: boolean;
   loading: boolean;
+  focused: boolean;
   soundOn: boolean;
+  appearanceLabel: string;
   pushLabel: string;
   pushNote: string;
   pushBusy: boolean;
   fx: { nonce: number; kind: GooseKind } | null;
-  onSendText: (body: string) => Promise<void>;
+  onSendText: (body: string, replyTo?: number | null) => Promise<void>;
+  onEdit: (id: number, body: string) => Promise<void>;
+  onUnsend: (message: Message) => Promise<void>;
+  onReact: (messageId: number, emoji: string) => Promise<void>;
+  onSearch: (query: string) => Promise<Message[]>;
+  onFocusMessage: (id: number) => Promise<void>;
+  onShowLatest: () => void;
   onPhoto: (source: 'camera' | 'library') => Promise<void>;
   onSendVoice: (draft: VoiceDraft) => Promise<void>;
   onTyping: (on: boolean) => void;
   onLoadOlder: () => void;
   onToggleSound: () => void;
+  onCycleAppearance: () => void;
   onEnablePush: () => void;
   onSignOut: () => void;
   resolvePhoto: (path: string) => Promise<string>;
@@ -80,6 +94,12 @@ export function ChatView(props: Props) {
   const [toast, setToast] = useState<string | null>(null);
   const [settings, setSettings] = useState(false);
   const [photo, setPhoto] = useState<string | null>(null);
+  const [reply, setReply] = useState<Message | null>(null);
+  const [editing, setEditing] = useState<Message | null>(null);
+  const [actions, setActions] = useState<Message | null>(null);
+  const [confirmUnsend, setConfirmUnsend] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [highlightId, setHighlightId] = useState<number | null>(null);
   const [recording, setRecording] = useState(false);
   const [levels, setLevels] = useState<number[]>([]);
   const listRef = useRef<FlatList<Message>>(null);
@@ -111,8 +131,15 @@ export function ChatView(props: Props) {
   }, [recorderState]);
 
   useEffect(() => {
-    if (stick.current) listRef.current?.scrollToEnd({ animated: true });
-  }, [props.messages.length, props.typing]);
+    if (highlightId != null || !stick.current) return;
+    listRef.current?.scrollToEnd({ animated: true });
+  }, [highlightId, props.messages.length, props.typing]);
+
+  useEffect(() => {
+    if (highlightId == null) return;
+    const index = props.messages.findIndex((message) => message.id === highlightId);
+    if (index >= 0) listRef.current?.scrollToIndex({ index, viewPosition: 0.45, animated: true });
+  }, [highlightId, props.messages]);
 
   function updateDraft(value: string) {
     setDraft(value);
@@ -134,17 +161,45 @@ export function ChatView(props: Props) {
     }
   }
 
+  function nameFor(senderId: string) {
+    if (senderId === props.me.id) return props.me.display;
+    if (senderId === props.other.id) return props.other.display;
+    return 'Them';
+  }
+
   async function sendText() {
     const body = draft;
     if (!body.trim()) return;
+    const editingNow = editing;
+    const replyId = reply?.id ?? null;
     setDraft('');
     updateDraft('');
+    setReply(null);
+    setEditing(null);
     hapticTap();
     try {
-      await props.onSendText(body);
+      if (editingNow) await props.onEdit(editingNow.id, body);
+      else await props.onSendText(body, replyId);
     } catch {
       setDraft(body);
-      showToast('Didn’t send — check your connection');
+      if (editingNow) setEditing(editingNow);
+      else if (replyId) setReply(props.messages.find((message) => message.id === replyId) ?? null);
+      showToast(editingNow ? 'Couldn’t edit that' : 'Didn’t send — check your connection');
+    }
+  }
+
+  async function jumpTo(id: number) {
+    stick.current = false;
+    setSearchOpen(false);
+    setActions(null);
+    try {
+      await props.onFocusMessage(id);
+      setHighlightId(id);
+      const index = props.messages.findIndex((message) => message.id === id);
+      if (index >= 0) listRef.current?.scrollToIndex({ index, viewPosition: 0.45 });
+      setTimeout(() => setHighlightId((current) => (current === id ? null : current)), 1400);
+    } catch {
+      showToast('Couldn’t find that bop');
     }
   }
 
@@ -258,6 +313,9 @@ export function ChatView(props: Props) {
             <Text style={[styles.status, { color: theme.muted }]}>{props.online ? 'here now ♪' : 'away'}</Text>
           </View>
         </View>
+        <Pressable accessibilityLabel="Search messages" onPress={() => setSearchOpen(true)} style={styles.iconBtn}>
+          <Text style={styles.icon}>🔍</Text>
+        </Pressable>
         <Pressable accessibilityLabel="Settings" onPress={() => setSettings(true)} style={styles.iconBtn}>
           <Text style={[styles.icon, { color: theme.text }]}>⋯</Text>
         </Pressable>
@@ -266,10 +324,14 @@ export function ChatView(props: Props) {
       <KeyboardAvoidingView style={styles.fill} behavior="padding" automaticOffset>
         <MessageList
           me={props.me}
+          other={props.other}
           messages={props.messages}
+          reactions={props.reactions}
           otherRead={props.otherRead}
           hasMore={props.hasMore}
           loading={props.loading}
+          focused={props.focused}
+          highlightId={highlightId}
           listRef={listRef}
           onStick={(next) => {
             stick.current = next;
@@ -278,9 +340,22 @@ export function ChatView(props: Props) {
             stick.current = false;
             props.onLoadOlder();
           }}
+          onShowLatest={() => {
+            stick.current = true;
+            props.onShowLatest();
+          }}
           onOpenPhoto={setPhoto}
+          onLongPress={(message) => {
+            setConfirmUnsend(false);
+            setActions(message);
+          }}
+          onReact={(messageId, emoji) => {
+            props.onReact(messageId, emoji).catch(() => showToast('Couldn’t save that reaction'));
+          }}
+          onJump={(id) => {
+            void jumpTo(id);
+          }}
           resolvePhoto={props.resolvePhoto}
-          onToast={showToast}
           voice={{
             activeId: voiceId,
             playing: status.playing,
@@ -305,6 +380,27 @@ export function ChatView(props: Props) {
           tint={theme.dark ? 'dark' : 'light'}
           style={[styles.composer, { paddingBottom: (keyboardOpen ? 8 : insets.bottom) + 8, backgroundColor: theme.header }]}
         >
+          {reply || editing ? (
+            <View style={[styles.composeContext, { backgroundColor: theme.card }]}>
+              <View style={styles.composeCopy}>
+                <Text style={styles.composeKicker}>{editing ? 'Editing' : `Replying to ${nameFor((reply ?? editing)!.sender)}`}</Text>
+                <Text style={[styles.composeSnippet, { color: theme.text }]} numberOfLines={1}>
+                  {replySnippet(editing ?? reply)}
+                </Text>
+              </View>
+              <Pressable
+                accessibilityLabel="Cancel"
+                onPress={() => {
+                  setReply(null);
+                  setEditing(null);
+                  setDraft('');
+                }}
+                style={styles.iconBtn}
+              >
+                <Text style={[styles.icon, { color: theme.text }]}>✕</Text>
+              </Pressable>
+            </View>
+          ) : null}
           {recording ? (
             <View style={styles.inputRow}>
               <Pressable accessibilityLabel="Cancel recording" onPress={() => void finishRecording(false)} style={styles.iconBtn}>
@@ -337,8 +433,8 @@ export function ChatView(props: Props) {
                 style={[styles.input, { color: theme.text, backgroundColor: theme.input, borderColor: theme.border }]}
               />
               {hasText ? (
-                <Pressable accessibilityLabel="Send" onPress={() => void sendText()} style={styles.send}>
-                  <Text style={styles.sendLabel}>♪</Text>
+                <Pressable accessibilityLabel={editing ? 'Save edit' : 'Send'} onPress={() => void sendText()} style={styles.send}>
+                  <Text style={styles.sendLabel}>{editing ? '✓' : '♪'}</Text>
                 </Pressable>
               ) : (
                 <Pressable accessibilityLabel="Record voice note" onPress={() => void startRecording()} style={styles.iconBtn}>
@@ -368,6 +464,11 @@ export function ChatView(props: Props) {
           hapticSelect();
           props.onToggleSound();
         }}
+        appearanceLabel={props.appearanceLabel}
+        onCycleAppearance={() => {
+          hapticSelect();
+          props.onCycleAppearance();
+        }}
         onEnablePush={() => {
           hapticTap();
           props.onEnablePush();
@@ -381,6 +482,60 @@ export function ChatView(props: Props) {
         }}
       />
       <PhotoViewer uri={photo} onClose={() => setPhoto(null)} />
+      <MessageActions
+        message={actions}
+        mine={actions?.sender === props.me.id}
+        currentEmoji={props.reactions.find((row) => row.message_id === actions?.id && row.user_id === props.me.id)?.emoji ?? null}
+        confirming={confirmUnsend}
+        onClose={() => {
+          setActions(null);
+          setConfirmUnsend(false);
+        }}
+        onReact={(emoji) => {
+          if (!actions) return;
+          const id = actions.id;
+          setActions(null);
+          props.onReact(id, emoji).catch(() => showToast('Couldn’t save that reaction'));
+        }}
+        onReply={() => {
+          if (!actions) return;
+          setEditing(null);
+          setReply(actions);
+          setActions(null);
+        }}
+        onCopy={() => {
+          if (!actions || actions.kind !== 'text') return;
+          Clipboard.setStringAsync(actions.body).then(() => {
+            hapticSelect();
+            showToast('Copied');
+            setActions(null);
+          });
+        }}
+        onEdit={() => {
+          if (!actions) return;
+          setReply(null);
+          setEditing(actions);
+          setDraft(actions.body);
+          setActions(null);
+        }}
+        onUnsend={() => setConfirmUnsend(true)}
+        onConfirmUnsend={() => {
+          if (!actions) return;
+          const message = actions;
+          setActions(null);
+          setConfirmUnsend(false);
+          props.onUnsend(message).catch(() => showToast('Couldn’t unsend that'));
+        }}
+      />
+      <SearchSheet
+        visible={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        onSearch={props.onSearch}
+        onPick={(message) => {
+          void jumpTo(message.id);
+        }}
+        nameFor={nameFor}
+      />
     </View>
   );
 }
@@ -408,6 +563,10 @@ const styles = StyleSheet.create({
   typingBubble: { alignSelf: 'flex-start', flexDirection: 'row', gap: 6, borderRadius: 18, paddingHorizontal: 14, paddingVertical: 8 },
   typingNote: { color: palette.pink, fontSize: 18 },
   composer: { paddingHorizontal: 10, paddingTop: 8, overflow: 'hidden' },
+  composeContext: { flexDirection: 'row', alignItems: 'center', borderRadius: 16, paddingLeft: 12, marginBottom: 6, borderLeftWidth: 3, borderLeftColor: palette.sun },
+  composeCopy: { flex: 1 },
+  composeKicker: { fontFamily: 'Fredoka_700Bold', color: palette.sun, fontSize: 12 },
+  composeSnippet: { fontFamily: 'Fredoka_500Medium', fontSize: 14 },
   inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 6 },
   input: {
     flex: 1,

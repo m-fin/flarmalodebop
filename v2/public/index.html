@@ -18,6 +18,16 @@
 <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png">
 <link rel="icon" href="/icons/icon-32.png">
 <link rel="stylesheet" href="/style.css">
+<script>
+try {
+  var pref = localStorage.appearance || 'dusk';
+  var dark = matchMedia('(prefers-color-scheme: dark)').matches;
+  var theme = pref === 'dawn' ? 'light' : pref === 'dusk' ? 'dark' : (dark ? 'dark' : 'light');
+  document.documentElement.dataset.theme = theme;
+  var meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = theme === 'light' ? '#fff1e4' : '#2a1240';
+} catch (e) {}
+</script>
 </head>
 <body>
 <div id="bg" aria-hidden="true"><div class="staff"></div><span class="fl n1">♪</span><span class="fl n2">♫</span><span class="fl n3">♩</span><span class="fl n4">♬</span><span class="fl n5">♪</span></div>
@@ -50,11 +60,13 @@
       <div class="other-name" id="otherName">Hailey</div>
       <div class="status" id="status"><span class="dot"></span><span id="statusText">offline</span></div>
     </div>
+    <button class="icon-btn" id="searchBtn" aria-label="Search messages">🔍</button>
     <button class="icon-btn" id="menuBtn" aria-label="Settings">⋯</button>
   </header>
 
   <main id="scroller">
     <button id="loadOlder" class="older hidden">earlier bops</button>
+    <button id="backLatest" class="older hidden">back to latest</button>
     <div id="empty" class="empty hidden">
       <div class="big">♫</div>
       <p>This is the very first note.<br>Say something nice.</p>
@@ -64,6 +76,13 @@
   </main>
 
   <footer class="composer">
+    <div id="composeContext" class="compose-context hidden">
+      <div class="compose-copy">
+        <div id="composeKicker"></div>
+        <div id="composeSnippet"></div>
+      </div>
+      <button class="icon-btn" id="composeCancel" aria-label="Cancel">✕</button>
+    </div>
     <div id="recBar" class="rec-bar hidden">
       <button class="icon-btn" id="recCancel" aria-label="Cancel recording">✕</button>
       <div class="rec-viz"><span class="rec-dot"></span><canvas id="recCanvas" width="400" height="44"></canvas></div>
@@ -87,13 +106,24 @@
     <button id="pushBtn" class="btn-row">🔔 Turn on notifications</button>
     <p class="muted small" id="pushNote"></p>
     <button id="soundBtn" class="btn-row">🎵 Bop sounds: on</button>
+    <button id="appearanceBtn" class="btn-row">🌗 Appearance: Dusk</button>
     <button id="logoutBtn" class="btn-row danger">Sign out</button>
     <button id="closeSheet" class="btn-row ghost">Close</button>
   </div>
 </div>
 
 <div id="viewer" class="viewer hidden"><img alt=""></div>
+
+<div id="searchSheet" class="sheet hidden" role="dialog" aria-modal="true" aria-label="Search messages">
+  <div class="sheet-card search-card">
+    <h2>Search</h2>
+    <input id="searchInput" type="search" placeholder="Search your bops" enterkeyhint="search" autocomplete="off">
+    <div id="searchResults" class="search-results"></div>
+    <button id="closeSearch" class="btn-row ghost">Close</button>
+  </div>
+</div>
 <script src="/config.js"></script>
+<script src="/logic.js"></script>
 <script src="/vendor/supabase.js"></script>
 <script src="/app.js"></script>
 </body>

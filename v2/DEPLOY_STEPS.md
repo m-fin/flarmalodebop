@@ -16,6 +16,8 @@ Files on the box:
 2. Paste the **entire** contents of `v2/supabase/setup.sql` → **Run**. If it asks to confirm "destructive operation", confirm: the only delete removes a stray throwaway `smoke-…@example.com` test user.
 3. Expected: "Success", with a final result table `username | display` that has **0 rows** (the users don't exist yet). The script is idempotent, so it's safe to re-run.
 
+Already deployed an older `setup.sql`? Paste `v2/supabase/migrations/20261115_reactions_replies_edits.sql` instead of the whole file (or re-run `setup.sql`). It adds `reply_to`, `edited_at`, `message_reactions`, `edit_message()`, and `set_reaction()`. Existing messages, profiles, media, and push rows stay as they are.
+
 ## 2. Create the two users (Supabase)
 1. SQL Editor → **+ New query** → paste the contents of `/home/box/.secrets/flarmalodebop-v2-users.sql` → **Run**.
 2. Expected result: 2 rows, `frog | Frog` and `hailey | Hailey`.

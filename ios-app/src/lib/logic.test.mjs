@@ -3,6 +3,7 @@ import test from 'node:test';
 import { emailFor } from './config.ts';
 import { formatDur } from './format.ts';
 import { gooseEffect, pushPreview, receiptFor } from './goose.ts';
+import { canEdit, canUnsend, groupReactions, likePattern, localSearch, nextReactions, replySnippet, resolveAppearance, resolveReply } from './thread.ts';
 
 test('username maps to the two member emails', () => {
   assert.equal(emailFor('frog'), 'frog@flarmalodebop.app');
@@ -36,6 +37,64 @@ test('read receipt sits on the latest outgoing message only', () => {
   assert.deepEqual(receiptFor(messages, 'me', 3), { messageId: 3, label: '♫ Read' });
   assert.deepEqual(receiptFor(messages, 'me', 2), { messageId: 3, label: '♪ Delivered' });
   assert.equal(receiptFor([...messages, { id: 4, sender: 'them' }], 'me', 4), null);
+});
+
+test('reactions are one per person and toggle off', () => {
+  const rows = [
+    { message_id: 1, user_id: 'frog', emoji: '❤️' },
+    { message_id: 1, user_id: 'hailey', emoji: '🐸' },
+  ];
+  assert.deepEqual(groupReactions(rows, 'frog'), [
+    { emoji: '❤️', count: 1, mine: true },
+    { emoji: '🐸', count: 1, mine: false },
+  ]);
+  const replaced = nextReactions(rows, 'frog', '🪿');
+  assert.equal(replaced.find((row) => row.user_id === 'frog').emoji, '🪿');
+  assert.equal(replaced.length, 2);
+  const cleared = nextReactions(replaced, 'frog', '🪿');
+  assert.equal(cleared.some((row) => row.user_id === 'frog'), false);
+  assert.equal(nextReactions(rows, 'frog', 'not-a-reaction').length, 2);
+});
+
+test('reply snippets and live quote resolution', () => {
+  assert.equal(replySnippet(null), 'Earlier message');
+  assert.equal(replySnippet({ kind: 'photo', body: '' }), '📷 Photo');
+  assert.equal(replySnippet({ kind: 'voice', body: '' }), '🎙️ Voice note');
+  assert.equal(replySnippet({ kind: 'text', body: '  pond\nnotes  ' }), 'pond notes');
+  const messages = [
+    { id: 1, sender: 'hailey', kind: 'text', body: 'original', reply_to: null, reply: null },
+    { id: 2, sender: 'frog', kind: 'text', body: 'reply', reply_to: 1, reply: { id: 1, sender: 'hailey', kind: 'text', body: 'stale' } },
+  ];
+  assert.equal(resolveReply(messages[1], messages).body, 'original');
+  assert.equal(resolveReply({ ...messages[1], reply_to: 9 }, messages).body, 'stale');
+});
+
+test('search pattern escapes like wildcards and edit rights stay with the author', () => {
+  assert.equal(likePattern('  lily  '), '%lily%');
+  assert.equal(likePattern('100%_done'), '%100\\%\\_done%');
+  assert.equal(likePattern('   '), null);
+  const mine = { kind: 'text', sender: 'frog' };
+  assert.equal(canEdit(mine, 'frog'), true);
+  assert.equal(canEdit({ kind: 'photo', sender: 'frog' }, 'frog'), false);
+  assert.equal(canEdit(mine, 'hailey'), false);
+  assert.equal(canUnsend({ sender: 'frog' }, 'frog'), true);
+  assert.equal(canUnsend({ sender: 'frog' }, 'hailey'), false);
+  const found = localSearch(
+    [
+      { body: 'lily pad' },
+      { body: 'honk' },
+    ],
+    'LILY',
+  );
+  assert.equal(found.length, 1);
+  assert.equal(found[0].body, 'lily pad');
+});
+
+test('appearance resolves dusk, dawn, and the device', () => {
+  assert.equal(resolveAppearance('dusk', false), 'dark');
+  assert.equal(resolveAppearance('dawn', true), 'light');
+  assert.equal(resolveAppearance('system', true), 'dark');
+  assert.equal(resolveAppearance('system', false), 'light');
 });
 
 test('duration formatting', () => {
