@@ -62,6 +62,7 @@ function Root() {
         <Stack.Screen name="login" />
         <Stack.Screen name="chat" />
         <Stack.Screen name="preview" />
+        <Stack.Screen name="privacy" options={{ animation: 'slide_from_right' }} />
       </Stack>
     </View>
   );

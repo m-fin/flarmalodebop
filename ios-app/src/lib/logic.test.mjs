@@ -3,7 +3,7 @@ import test from 'node:test';
 import { emailFor } from './config.ts';
 import { formatDur } from './format.ts';
 import { gooseEffect, pushPreview, receiptFor } from './goose.ts';
-import { canEdit, canUnsend, groupReactions, likePattern, localSearch, nextReactions, replySnippet, resolveAppearance, resolveReply } from './thread.ts';
+import { canEdit, canUnsend, draftKey, draftToStore, firstUnreadId, groupReactions, likePattern, localSearch, nextReactions, normalizeDraft, photoRoll, replySnippet, resolveAppearance, resolveReply } from './thread.ts';
 
 test('username maps to the two member emails', () => {
   assert.equal(emailFor('frog'), 'frog@flarmalodebop.app');
@@ -95,6 +95,23 @@ test('appearance resolves dusk, dawn, and the device', () => {
   assert.equal(resolveAppearance('dawn', true), 'light');
   assert.equal(resolveAppearance('system', true), 'dark');
   assert.equal(resolveAppearance('system', false), 'light');
+});
+
+test('unread marker, photo roll, and drafts', () => {
+  const messages = [
+    { id: 1, kind: 'text', body: 'hi', file_path: null },
+    { id: 2, kind: 'photo', body: '', file_path: 'frog/a.jpg' },
+    { id: 4, kind: 'photo', body: 'lily', file_path: 'hailey/b.jpg' },
+  ];
+  assert.equal(firstUnreadId(messages, null), null);
+  assert.equal(firstUnreadId(messages, 4), null);
+  assert.equal(firstUnreadId(messages, 1), 2);
+  assert.deepEqual(photoRoll(messages).map((row) => row.id), [4, 2]);
+  assert.equal(draftKey('frog'), 'flarm-draft:frog');
+  assert.equal(normalizeDraft(null), '');
+  assert.equal(draftToStore(''), null);
+  assert.equal(draftToStore('pond'), 'pond');
+  assert.equal(draftToStore('x'.repeat(9000)).length, 8000);
 });
 
 test('duration formatting', () => {

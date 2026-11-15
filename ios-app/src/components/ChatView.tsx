@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ActionSheetIOS,
   Alert,
@@ -10,6 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAvoidingView, useKeyboardState } from 'react-native-keyboard-controller';
 import {
@@ -28,13 +30,14 @@ import { avatarFor } from '@/lib/config';
 import { downsamplePeaks, formatDur, meterLevel } from '@/lib/format';
 import { hapticSelect, hapticTap } from '@/lib/haptics';
 import { sessionMode } from '@/lib/sounds';
-import { replySnippet } from '@/lib/thread';
+import { draftKey, draftToStore, firstUnreadId, normalizeDraft, replySnippet } from '@/lib/thread';
 import { palette, useTheme } from '@/lib/theme';
 import type { Message, Profile, Reaction } from '@/lib/types';
 import { Background } from '@/components/Background';
 import { GooseFx } from '@/components/GooseFx';
 import { MessageActions } from '@/components/MessageActions';
 import { MessageList } from '@/components/MessageList';
+import { PhotoRoll } from '@/components/PhotoRoll';
 import { PhotoViewer } from '@/components/PhotoViewer';
 import { SearchSheet } from '@/components/SearchSheet';
 import { SettingsSheet } from '@/components/SettingsSheet';
@@ -99,10 +102,15 @@ export function ChatView(props: Props) {
   const [actions, setActions] = useState<Message | null>(null);
   const [confirmUnsend, setConfirmUnsend] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [photosOpen, setPhotosOpen] = useState(false);
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const [recording, setRecording] = useState(false);
   const [levels, setLevels] = useState<number[]>([]);
   const listRef = useRef<FlatList<Message>>(null);
+  const readAtOpen = useRef(props.me.last_read);
+  const draftReady = useRef(false);
+  const suspendDraft = useRef(false);
+  const draftRef = useRef('');
   const stick = useRef(true);
   const typingOn = useRef(false);
   const idle = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -141,8 +149,37 @@ export function ChatView(props: Props) {
     if (index >= 0) listRef.current?.scrollToIndex({ index, viewPosition: 0.45, animated: true });
   }, [highlightId, props.messages]);
 
+  useEffect(() => {
+    let live = true;
+    AsyncStorage.getItem(draftKey(props.me.id))
+      .then((value) => {
+        if (!live || draftRef.current) return;
+        const text = normalizeDraft(value);
+        if (!text) return;
+        draftRef.current = text;
+        setDraft(text);
+      })
+      .catch(() => {})
+      .finally(() => {
+        draftReady.current = true;
+      });
+    return () => {
+      live = false;
+    };
+  }, [props.me.id]);
+
+  function rememberDraft(value: string) {
+    if (!draftReady.current || suspendDraft.current) return;
+    const key = draftKey(props.me.id);
+    const stored = draftToStore(value);
+    if (stored == null) AsyncStorage.removeItem(key).catch(() => {});
+    else AsyncStorage.setItem(key, stored).catch(() => {});
+  }
+
   function updateDraft(value: string) {
+    draftRef.current = value;
     setDraft(value);
+    rememberDraft(value);
     const has = value.trim().length > 0;
     if (has && !typingOn.current) {
       typingOn.current = true;
@@ -172,18 +209,24 @@ export function ChatView(props: Props) {
     if (!body.trim()) return;
     const editingNow = editing;
     const replyId = reply?.id ?? null;
-    setDraft('');
-    updateDraft('');
+    suspendDraft.current = false;
     setReply(null);
     setEditing(null);
+    if (editingNow) setDraft('');
+    else updateDraft('');
     hapticTap();
     try {
       if (editingNow) await props.onEdit(editingNow.id, body);
       else await props.onSendText(body, replyId);
     } catch {
-      setDraft(body);
-      if (editingNow) setEditing(editingNow);
-      else if (replyId) setReply(props.messages.find((message) => message.id === replyId) ?? null);
+      if (editingNow) {
+        suspendDraft.current = true;
+        setEditing(editingNow);
+        setDraft(body);
+      } else {
+        if (replyId) setReply(props.messages.find((message) => message.id === replyId) ?? null);
+        updateDraft(body);
+      }
       showToast(editingNow ? 'Couldn’t edit that' : 'Didn’t send — check your connection');
     }
   }
@@ -313,6 +356,9 @@ export function ChatView(props: Props) {
             <Text style={[styles.status, { color: theme.muted }]}>{props.online ? 'here now ♪' : 'away'}</Text>
           </View>
         </View>
+        <Pressable accessibilityLabel="Photos" onPress={() => setPhotosOpen(true)} style={styles.iconBtn}>
+          <Text style={styles.icon}>🖼️</Text>
+        </Pressable>
         <Pressable accessibilityLabel="Search messages" onPress={() => setSearchOpen(true)} style={styles.iconBtn}>
           <Text style={styles.icon}>🔍</Text>
         </Pressable>
@@ -332,6 +378,7 @@ export function ChatView(props: Props) {
           loading={props.loading}
           focused={props.focused}
           highlightId={highlightId}
+          readAtOpen={readAtOpen.current}
           listRef={listRef}
           onStick={(next) => {
             stick.current = next;
@@ -391,9 +438,14 @@ export function ChatView(props: Props) {
               <Pressable
                 accessibilityLabel="Cancel"
                 onPress={() => {
+                  const wasEditing = editing != null;
                   setReply(null);
                   setEditing(null);
-                  setDraft('');
+                  suspendDraft.current = false;
+                  if (!wasEditing) return;
+                  AsyncStorage.getItem(draftKey(props.me.id))
+                    .then((value) => setDraft(normalizeDraft(value)))
+                    .catch(() => setDraft(''));
                 }}
                 style={styles.iconBtn}
               >
@@ -473,6 +525,10 @@ export function ChatView(props: Props) {
           hapticTap();
           props.onEnablePush();
         }}
+        onPrivacy={() => {
+          setSettings(false);
+          router.push('/privacy');
+        }}
         onSignOut={() => {
           setSettings(false);
           Alert.alert('Sign out?', undefined, [
@@ -513,6 +569,7 @@ export function ChatView(props: Props) {
         }}
         onEdit={() => {
           if (!actions) return;
+          suspendDraft.current = true;
           setReply(null);
           setEditing(actions);
           setDraft(actions.body);
@@ -525,6 +582,16 @@ export function ChatView(props: Props) {
           setActions(null);
           setConfirmUnsend(false);
           props.onUnsend(message).catch(() => showToast('Couldn’t unsend that'));
+        }}
+      />
+      <PhotoRoll
+        visible={photosOpen}
+        messages={props.messages}
+        onClose={() => setPhotosOpen(false)}
+        resolvePhoto={props.resolvePhoto}
+        onOpen={(uri) => {
+          setPhotosOpen(false);
+          setPhoto(uri);
         }}
       />
       <SearchSheet

@@ -11,8 +11,18 @@
 --   set_reaction()      — members may set or clear their own reaction
 --
 -- Fresh installs: v2/supabase/setup.sql already includes this.
--- Existing projects: paste this file into the Supabase SQL editor and run it.
+-- Existing projects: paste this file into the Supabase SQL editor and run it
+-- BEFORE 20261115060000_private_helpers_and_force_rls.sql.
+-- Do not re-run it after that lock-down: this file still calls public.is_member().
 -- =====================================================================
+
+do $$
+begin
+  if to_regprocedure('private.is_member()') is not null
+     and to_regprocedure('public.is_member()') is null then
+    raise exception 'skip 20261115_reactions_replies_edits.sql: setup.sql or the later lock-down migration already replaced public.is_member()';
+  end if;
+end $$;
 
 alter table public.messages
   add column if not exists reply_to bigint references public.messages(id) on delete set null;

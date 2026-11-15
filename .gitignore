@@ -2,5 +2,8 @@ node_modules/
 data/
 logs/
 LIVE_URL.txt
+.env
+.env.*
 *.env
+!.env.example
 .secrets/

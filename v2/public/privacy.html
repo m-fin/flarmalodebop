@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Privacy policy · Flarmalodebop</title>
+<meta name="theme-color" content="#2a1240">
+<link rel="icon" href="/icons/icon-32.png">
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; font: 17px/1.5 "Iowan Old Style", Palatino, Georgia, serif; background: #2a1240; color: #fff6ea; }
+  main { max-width: 40rem; margin: 0 auto; padding: 32px 20px 64px; }
+  a { color: #ffc861; }
+  h1 { font-weight: 500; font-size: 2rem; margin-bottom: 0; }
+  h2 { font-size: 1.15rem; margin-top: 1.6em; }
+  .meta { opacity: .75; }
+</style>
+</head>
+<body>
+<main>
+  <p><a href="/">← Flarmalodebop</a></p>
+  <h1>Privacy policy</h1>
+  <p class="meta">Effective November 15, 2026. This is the privacy policy for the Flarmalodebop web app and the Flarmalodebop iOS app.</p>
+
+  <h2>Who we are</h2>
+  <p>Flarmalodebop is a private messenger for exactly two people. Matthew Finley operates it. It is not a social network and it does not show ads.</p>
+  <p>Questions about this policy: open an issue on <a href="https://github.com/m-fin/flarmalodebop">github.com/m-fin/flarmalodebop</a>.</p>
+
+  <h2>What the app stores</h2>
+  <ul>
+    <li><strong>Account.</strong> An email address and display name for each of the two invited people, plus the password hash held by the login provider. There is no public signup.</li>
+    <li><strong>Messages you choose to send.</strong> Text, photos, voice notes, emoji reactions, replies, and edits. Unsending a message deletes that row. Photos and voice notes are deleted with it when the app can remove the file.</li>
+    <li><strong>Read state and presence.</strong> A pointer to the latest message each person has seen, and a short “app is open” heartbeat so the other person can see “here now”.</li>
+    <li><strong>Push tokens.</strong> If you turn on notifications, the app stores a push token so a new message can reach your phone while the app is closed. The token is visible only to your account.</li>
+    <li><strong>Drafts.</strong> Text you have typed but not sent is saved on that device only. It is not sent to the server until you send it.</li>
+  </ul>
+  <p>The app does not ask for your contacts, location, or advertising identifier. It does not use a third-party analytics or advertising SDK.</p>
+
+  <h2>Camera, photos, and microphone</h2>
+  <p>The camera, photo library, and microphone are used only when you choose to send a picture or a voice note. Nothing is recorded in the background.</p>
+
+  <h2>Who can read a message</h2>
+  <p>The two signed-in people can read the thread. Someone who is not signed in cannot. Messages are encrypted in transit (HTTPS) and stored by Supabase, which encrypts data at rest. They are <strong>not end-to-end encrypted</strong>. The person who operates the Supabase project can access the database. Do not use Flarmalodebop for secrets you would not trust that operator with.</p>
+
+  <h2>How long it is kept</h2>
+  <p>Messages stay until you unsend them or the project’s database is deleted. Signing out removes the session from that device. Push tokens stay until you turn notifications off or the row is removed. Drafts stay on the device until you send, clear the composer, or delete the app’s storage.</p>
+
+  <h2>Children</h2>
+  <p>Flarmalodebop is not directed at children under 13, and you should not make an account for a child.</p>
+
+  <h2>Changes</h2>
+  <p>If this policy changes, the date at the top of this page changes with it. The same text is linked from the iOS app’s settings and sign-in screen.</p>
+</main>
+</body>
+</html>

@@ -87,6 +87,9 @@ export default function LoginScreen() {
         <Text style={styles.error} accessibilityRole="alert">
           {error}
         </Text>
+        <Text accessibilityRole="link" onPress={() => router.push('/privacy')} style={styles.legal}>
+          Privacy policy
+        </Text>
       </View>
     </KeyboardAvoidingView>
     </View>
@@ -106,4 +109,5 @@ const styles = StyleSheet.create({
   button: { marginTop: 12, borderRadius: 18, backgroundColor: palette.pink, minHeight: 54, alignItems: 'center', justifyContent: 'center' },
   buttonText: { color: '#fff', fontFamily: 'Fredoka_700Bold', fontSize: 18 },
   error: { color: '#ffb4c4', textAlign: 'center', minHeight: 24, marginTop: 10, fontFamily: 'Fredoka_500Medium' },
+  legal: { color: palette.sun, textAlign: 'center', marginTop: 12, fontFamily: 'Fredoka_600SemiBold', fontSize: 15 },
 });

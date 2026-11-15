@@ -1,5 +1,7 @@
 # Flarmalodebop v2 (static + Supabase)
 
+The project README at the repo root is the one to follow for a public checkout. This file is the map of this folder.
+
 The same app as v1 (warm musical theme, live text, photos, voice notes, read receipts, typing, presence, PWA), rebuilt as a **fully static site** on Supabase. On top of that thread: emoji reactions, reply quotes, edit and unsend, message search, and a Dusk / Dawn / Match device appearance.
 
 - `public/`: the site Vercel serves (`config.js` holds the project URL and publishable key; supabase-js v2.119 is vendored at `vendor/supabase.js`)

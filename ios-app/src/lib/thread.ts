@@ -83,3 +83,30 @@ export function appearanceLabel(pref: Appearance): string {
   if (pref === 'system') return 'Match device';
   return 'Dusk';
 }
+
+/** First message the reader had not reached when they opened the thread. */
+export function firstUnreadId(messages: { id: number }[], readAtOpen: number | null | undefined): number | null {
+  if (readAtOpen == null) return null;
+  const read = Number(readAtOpen);
+  if (!Number.isFinite(read)) return null;
+  const hit = messages.find((message) => Number(message.id) > read);
+  return hit ? Number(hit.id) : null;
+}
+
+export function photoRoll<T extends { id: number; kind: string; file_path: string | null }>(messages: T[]): T[] {
+  return messages.filter((message) => message.kind === 'photo' && message.file_path).sort((a, b) => b.id - a.id);
+}
+
+export function draftKey(userId: string): string {
+  return `flarm-draft:${userId}`;
+}
+
+export function normalizeDraft(value: unknown): string {
+  return typeof value === 'string' ? value.slice(0, 8000) : '';
+}
+
+/** Empty text clears the saved draft. */
+export function draftToStore(text: string): string | null {
+  const next = normalizeDraft(text);
+  return next ? next : null;
+}

@@ -16,7 +16,9 @@ Files on the box:
 2. Paste the **entire** contents of `v2/supabase/setup.sql` → **Run**. If it asks to confirm "destructive operation", confirm: the only delete removes a stray throwaway `smoke-…@example.com` test user.
 3. Expected: "Success", with a final result table `username | display` that has **0 rows** (the users don't exist yet). The script is idempotent, so it's safe to re-run.
 
-Already deployed an older `setup.sql`? Paste `v2/supabase/migrations/20261115_reactions_replies_edits.sql` instead of the whole file (or re-run `setup.sql`). It adds `reply_to`, `edited_at`, `message_reactions`, `edit_message()`, and `set_reaction()`. Existing messages, profiles, media, and push rows stay as they are.
+Already deployed an older `setup.sql`? Either re-run the current `setup.sql`, or paste the migrations in filename order and stop. `20261115_reactions_replies_edits.sql` adds replies, edits, and reactions. `20261115060000_private_helpers_and_force_rls.sql` moves internal functions out of the exposed schema and forces row level security. Do not run the reactions file again after the lock-down file. Existing messages, profiles, media, and push rows stay as they are.
+
+The public privacy policy is `v2/public/privacy.html`. After deploy it is `https://<your-host>/privacy.html`. Use that URL in App Store Connect.
 
 ## 2. Create the two users (Supabase)
 1. SQL Editor → **+ New query** → paste the contents of `/home/box/.secrets/flarmalodebop-v2-users.sql` → **Run**.
@@ -34,7 +36,7 @@ The users are inserted straight into `auth.users`, so this works whether signups
 As a second layer, a database trigger rejects any auth user whose email isn't one of the two, even if signups get switched back on.
 
 ## 4. Host the frontend (Vercel)
-1. Vercel dashboard → **Add New… → Project** → **Import Git Repository** → `m-fin/flarmalodebop`. It's private, so if it isn't listed, click "Adjust GitHub App Permissions" and grant access to that one repo.
+1. Vercel dashboard → **Add New… → Project** → **Import Git Repository** → `m-fin/flarmalodebop`. If it isn’t listed, click "Adjust GitHub App Permissions" and grant access to that repo. The source can be public. The Supabase service-role key and the member passwords stay out of the repo.
 2. Configure:
    - **Project Name:** `flarmalodebop`
    - **Framework Preset:** `Other`

@@ -85,6 +85,43 @@
     return 'Dusk';
   }
 
+  // First message the reader had not reached when they opened the thread.
+  // null readAtOpen means "don't mark" (previews). 0 means nothing was read.
+  function firstUnreadId(messages, readAtOpen) {
+    if (readAtOpen == null || readAtOpen === '') return null;
+    const read = Number(readAtOpen);
+    if (!Number.isFinite(read)) return null;
+    const hit = (messages || []).find((message) => message && Number(message.id) > read);
+    return hit ? Number(hit.id) : null;
+  }
+
+  function photoRoll(messages) {
+    return (messages || [])
+      .filter((message) => message && message.kind === 'photo' && message.file_path)
+      .sort((a, b) => Number(b.id) - Number(a.id));
+  }
+
+  function draftKey(userId) {
+    return 'flarm-draft:' + String(userId || '');
+  }
+
+  function normalizeDraft(value) {
+    return typeof value === 'string' ? value.slice(0, 8000) : '';
+  }
+
+  function loadDraft(store, userId) {
+    if (!store || !userId) return '';
+    return normalizeDraft(store.getItem(draftKey(userId)));
+  }
+
+  function saveDraft(store, userId, text) {
+    if (!store || !userId) return;
+    const key = draftKey(userId);
+    const next = normalizeDraft(text);
+    if (!next) store.removeItem(key);
+    else store.setItem(key, next);
+  }
+
   return {
     REACTIONS,
     clip,
@@ -99,5 +136,11 @@
     resolveAppearance,
     cycleAppearance,
     appearanceLabel,
+    firstUnreadId,
+    photoRoll,
+    draftKey,
+    normalizeDraft,
+    loadDraft,
+    saveDraft,
   };
 });

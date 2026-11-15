@@ -49,6 +49,7 @@ try {
       <button type="submit" class="btn-primary">Let's bop</button>
       <p id="loginErr" class="err" role="alert"></p>
     </form>
+    <p class="legal"><a href="/privacy.html">Privacy policy</a></p>
   </div>
 </section>
 
@@ -60,6 +61,7 @@ try {
       <div class="other-name" id="otherName">Hailey</div>
       <div class="status" id="status"><span class="dot"></span><span id="statusText">offline</span></div>
     </div>
+    <button class="icon-btn" id="photosBtn" aria-label="Photos">🖼️</button>
     <button class="icon-btn" id="searchBtn" aria-label="Search messages">🔍</button>
     <button class="icon-btn" id="menuBtn" aria-label="Settings">⋯</button>
   </header>
@@ -107,12 +109,21 @@ try {
     <p class="muted small" id="pushNote"></p>
     <button id="soundBtn" class="btn-row">🎵 Bop sounds: on</button>
     <button id="appearanceBtn" class="btn-row">🌗 Appearance: Dusk</button>
+    <a id="privacyLink" class="btn-row" href="/privacy.html">Privacy policy</a>
     <button id="logoutBtn" class="btn-row danger">Sign out</button>
     <button id="closeSheet" class="btn-row ghost">Close</button>
   </div>
 </div>
 
 <div id="viewer" class="viewer hidden"><img alt=""></div>
+
+<div id="photosSheet" class="sheet hidden" role="dialog" aria-modal="true" aria-label="Photos">
+  <div class="sheet-card">
+    <h2>Our photos</h2>
+    <div id="photoGrid" class="photo-grid"></div>
+    <button id="closePhotos" class="btn-row ghost">Close</button>
+  </div>
+</div>
 
 <div id="searchSheet" class="sheet hidden" role="dialog" aria-modal="true" aria-label="Search messages">
   <div class="sheet-card search-card">
