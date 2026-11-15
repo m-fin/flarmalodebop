@@ -1,6 +1,8 @@
-import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useColorScheme } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SystemUI from 'expo-system-ui';
+import { cycleAppearance, resolveAppearance, type Appearance } from '@/lib/thread';
 
 export const palette = {
   plum: '#2a1240',
@@ -66,23 +68,54 @@ const lightTheme: Theme = {
 };
 
 const ThemeContext = createContext<Theme>(darkTheme);
+const AppearanceContext = createContext<{ appearance: Appearance; setAppearance: (next: Appearance) => void }>({
+  appearance: 'system',
+  setAppearance: () => {},
+});
+
+const STORAGE_KEY = 'flarm-appearance';
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const system = useColorScheme();
   const forced = process.env.EXPO_PUBLIC_COLOR_SCHEME;
+  const [appearance, setAppearanceState] = useState<Appearance>('system');
+
+  useEffect(() => {
+    AsyncStorage.getItem(STORAGE_KEY)
+      .then((stored) => {
+        if (stored === 'dusk' || stored === 'dawn' || stored === 'system') setAppearanceState(stored);
+      })
+      .catch(() => {});
+  }, []);
+
+  const setAppearance = useCallback((next: Appearance) => {
+    setAppearanceState(next);
+    AsyncStorage.setItem(STORAGE_KEY, next).catch(() => {});
+  }, []);
+
   const theme = useMemo(() => {
     if (forced === 'light') return lightTheme;
     if (forced === 'dark') return darkTheme;
-    return system === 'light' ? lightTheme : darkTheme;
-  }, [forced, system]);
+    const mode = resolveAppearance(appearance, system !== 'light');
+    return mode === 'light' ? lightTheme : darkTheme;
+  }, [appearance, forced, system]);
 
   useEffect(() => {
     SystemUI.setBackgroundColorAsync(theme.bg).catch(() => {});
   }, [theme.bg]);
 
-  return <ThemeContext.Provider value={theme}>{children}</ThemeContext.Provider>;
+  return (
+    <AppearanceContext.Provider value={{ appearance, setAppearance }}>
+      <ThemeContext.Provider value={theme}>{children}</ThemeContext.Provider>
+    </AppearanceContext.Provider>
+  );
 }
 
 export function useTheme(): Theme {
   return useContext(ThemeContext);
+}
+
+export function useAppearance(): { appearance: Appearance; setAppearance: (next: Appearance) => void; cycle: () => void } {
+  const ctx = useContext(AppearanceContext);
+  return { ...ctx, cycle: () => ctx.setAppearance(cycleAppearance(ctx.appearance)) };
 }

@@ -1,9 +1,10 @@
 # Flarmalodebop v2 (static + Supabase)
 
-The same app as v1 (warm musical theme, live text, photos, voice notes, read receipts, typing, presence, PWA), rebuilt as a **fully static site** on Supabase.
+The same app as v1 (warm musical theme, live text, photos, voice notes, read receipts, typing, presence, PWA), rebuilt as a **fully static site** on Supabase. On top of that thread: emoji reactions, reply quotes, edit and unsend, message search, and a Dusk / Dawn / Match device appearance.
 
 - `public/`: the site Vercel serves (`config.js` holds the project URL and publishable key; supabase-js v2.119 is vendored at `vendor/supabase.js`)
-- `supabase/setup.sql`: one idempotent script for tables, strict RLS, realtime publication, private-channel policies and the private `media` bucket with its policies
+- `supabase/setup.sql`: one idempotent script for tables, strict RLS, realtime publication, private-channel policies and the private `media` bucket with its policies. Re-running it on an existing project is safe.
+- `supabase/migrations/20261115_reactions_replies_edits.sql`: the same reactions, replies, and edit changes, for a database that already ran an older `setup.sql`. It only adds nullable columns, a new table, and two functions. It does not rewrite messages or accounts.
 - `supabase/functions/push/index.ts`: optional Web Push sender, deployed via the dashboard editor and triggered by a DB webhook
 - `scripts/`:
   - `gen-secrets.js`: new passwords, VAPID keys and the users SQL, written to `/home/box/.secrets/`, never printed

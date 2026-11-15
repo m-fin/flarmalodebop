@@ -16,7 +16,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 (async () => {
   console.log('Project:', URL);
   const anon = mk();
-  for (const t of ['messages', 'profiles', 'push_subscriptions', 'activity', 'allowed_members']) {
+  for (const t of ['messages', 'profiles', 'push_subscriptions', 'activity', 'allowed_members', 'message_reactions']) {
     const { data, error } = await anon.from(t).select('*').limit(1);
     ok(error || (data && data.length === 0), `anon cannot read ${t} (${error ? error.code || error.message : '0 rows'})`);
   }

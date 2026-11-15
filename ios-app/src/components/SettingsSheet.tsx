@@ -7,11 +7,13 @@ type Props = {
   visible: boolean;
   me: Profile;
   soundOn: boolean;
+  appearanceLabel: string;
   pushLabel: string;
   pushNote: string;
   pushBusy: boolean;
   onClose: () => void;
   onToggleSound: () => void;
+  onCycleAppearance: () => void;
   onEnablePush: () => void;
   onSignOut: () => void;
 };
@@ -31,6 +33,9 @@ export function SettingsSheet(props: Props) {
           {props.pushNote ? <Text style={[styles.note, { color: theme.muted }]}>{props.pushNote}</Text> : null}
           <Pressable style={[styles.row, { backgroundColor: theme.card }]} onPress={props.onToggleSound}>
             <Text style={[styles.rowText, { color: theme.text }]}>🎵 Bop & honk sounds: {props.soundOn ? 'on' : 'off'}</Text>
+          </Pressable>
+          <Pressable style={[styles.row, { backgroundColor: theme.card }]} onPress={props.onCycleAppearance}>
+            <Text style={[styles.rowText, { color: theme.text }]}>🌗 Appearance: {props.appearanceLabel}</Text>
           </Pressable>
           <Pressable style={[styles.row, { backgroundColor: theme.card }]} onPress={props.onSignOut}>
             <Text style={[styles.rowText, { color: theme.danger }]}>Sign out</Text>

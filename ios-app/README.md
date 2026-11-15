@@ -1,6 +1,8 @@
 # Flarmalodebop for iPhone
 
-Expo SDK 58 app (TypeScript, expo-router) for the same two people as the web app in `v2/`. Sign-in maps `frog` / `hailey` to `frog@flarmalodebop.app` and `hailey@flarmalodebop.app`. Chat uses the private realtime topic `flarm:room` (message changes, presence, typing), `mark_read` / `heartbeat`, and signed URLs for the private `media` bucket.
+Expo SDK 58 app (TypeScript, expo-router) for the same two people as the web app in `v2/`. Sign-in maps `frog` / `hailey` to `frog@flarmalodebop.app` and `hailey@flarmalodebop.app`. Chat uses the private realtime topic `flarm:room` (message changes, reactions, presence, typing), `mark_read` / `heartbeat`, and signed URLs for the private `media` bucket.
+
+Long-press a message to react, reply, copy, edit, or unsend. Double-tap sends a heart. Search is the magnifying glass. Settings cycles appearance: Dusk, Dawn, or Match device. Native push is unchanged: tokens still go to `push_subscriptions` and `v2/supabase/functions/expo-push` sends them once a device exists. No Apple Developer account is required to build or run the app.
 
 ```bash
 cd ios-app
