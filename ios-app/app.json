@@ -1,0 +1,78 @@
+{
+  "expo": {
+    "name": "Flarmalodebop",
+    "slug": "flarmalodebop",
+    "scheme": "flarmalodebop",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "bundleIdentifier": "app.flarmalodebop.ios",
+      "supportsTablet": false,
+      "icon": "./assets/icon.png",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIViewControllerBasedStatusBarAppearance": true
+      }
+    },
+    "android": {
+      "package": "app.flarmalodebop",
+      "adaptiveIcon": {
+        "backgroundColor": "#2A1240",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-secure-store",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#2A1240",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 220,
+          "dark": {
+            "backgroundColor": "#2A1240",
+            "image": "./assets/splash-icon.png"
+          }
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Flarmalodebop uses your photos so you can send a picture.",
+          "cameraPermission": "Flarmalodebop uses the camera so you can take a picture to send.",
+          "microphonePermission": "Flarmalodebop uses the microphone so you can send voice notes."
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Flarmalodebop uses the microphone so you can send voice notes.",
+          "enableBackgroundRecording": false,
+          "enableBackgroundPlayback": false
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#FF5E8A"
+        }
+      ],
+      "expo-asset"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "eas": {}
+    }
+  }
+}

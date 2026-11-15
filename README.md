@@ -29,3 +29,5 @@ Stack: Node 22.5+ (built-in `node:sqlite`), Express, ws, web-push. No external s
 
 ## Install on iPhone
 Open the URL in Safari → Share → **Add to Home Screen** → open from the icon → sign in → ⋯ → Turn on notifications.
+
+The native app is in `ios-app/` (Expo, bundle id `app.flarmalodebop.ios`). It uses this same Supabase project. TestFlight steps are in `ios-app/TESTFLIGHT.md`.
