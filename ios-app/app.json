@@ -4,16 +4,21 @@
     "slug": "flarmalodebop",
     "scheme": "flarmalodebop",
     "version": "1.0.0",
+    "description": "A tiny private messenger for two people.",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "app.flarmalodebop.ios",
+      "buildNumber": "1",
       "supportsTablet": false,
       "icon": "./assets/icon.png",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "UIViewControllerBasedStatusBarAppearance": true
+        "UIViewControllerBasedStatusBarAppearance": true,
+        "NSCameraUsageDescription": "Flarmalodebop uses the camera so you can take a picture to send.",
+        "NSPhotoLibraryUsageDescription": "Flarmalodebop uses your photos so you can send a picture.",
+        "NSMicrophoneUsageDescription": "Flarmalodebop uses the microphone so you can send voice notes."
       }
     },
     "android": {

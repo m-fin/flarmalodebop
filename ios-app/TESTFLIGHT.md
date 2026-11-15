@@ -16,7 +16,7 @@ Do this once the Apple Developer Program enrollment for **Matthew Finley** (acco
 2. Platforms: **iOS**. Name: **Flarmalodebop**. Primary language: **English (U.S.)**.
 3. Bundle ID: if `app.flarmalodebop.ios` is not in the menu yet, leave this step until after the first `eas build` (EAS can register the identifier). Then come back and create the app. Or register it first under [Certificates, Identifiers & Profiles](https://developer.apple.com/account/resources/identifiers/list) → **+** → App IDs → App → bundle id `app.flarmalodebop.ios`, enable **Push Notifications**.
 4. SKU: `flarmalodebop-ios`. User Access: **Full Access**.
-5. Support URL: any HTTPS page you control that loads (the live web app URL is fine). A privacy policy URL is required before an external TestFlight group, not before the Account Holder installs an internal build.
+5. Support URL: the live web app. Privacy Policy URL: `https://<your-web-host>/privacy.html` (the file is `v2/public/privacy.html`). App Store Connect requires that URL before an external TestFlight group and before App Review. The same policy is linked from the app’s sign-in screen and settings.
 
 `ios.infoPlist.ITSAppUsesNonExemptEncryption` is already `false` (only standard HTTPS). If App Store Connect still asks about export compliance on the build, answer that the app uses encryption only for HTTPS.
 
@@ -91,4 +91,4 @@ A notification is sent to the other person when a message is inserted and their 
 - Run `eas login`, `eas init`, `eas build -p ios --profile production`, and `eas submit` on a computer where you can enter the Apple ID password and any 2FA code. This agent cannot sign into Apple or Expo for you.
 - Create the `expo-push` function and the `flarm_expo_push` webhook in the Supabase dashboard (the service role key never goes in the app).
 - Share Hailey’s existing password with her yourself. It is not in git.
-- Keep this GitHub repo **private**. `eas init` on a personal Expo account does not publish the source.
+- The source may be public. `eas init` on a personal Expo account does not publish extra source. Keep the service-role key, the member passwords, and the Apple credentials out of git.

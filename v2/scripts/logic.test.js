@@ -42,6 +42,53 @@ test('appearance cycles dusk, dawn, then the device', () => {
   assert.equal(logic.appearanceLabel('system'), 'Match device');
 });
 
+test('env files are gitignored and the privacy page names no private contact', () => {
+  const { execFileSync } = require('node:child_process');
+  const root = path.join(__dirname, '..', '..');
+  for (const name of ['.env', '.env.local', '.env.production', 'ios-app/.env', 'secrets.env']) {
+    const out = execFileSync('git', ['check-ignore', name], { cwd: root, encoding: 'utf8' }).trim();
+    assert.equal(out, name);
+  }
+  let exampleIgnored = true;
+  try {
+    execFileSync('git', ['check-ignore', '.env.example'], { cwd: root, stdio: 'pipe' });
+  } catch {
+    exampleIgnored = false;
+  }
+  assert.equal(exampleIgnored, false);
+  const privacy = fs.readFileSync(path.join(__dirname, '..', 'public', 'privacy.html'), 'utf8');
+  assert.match(privacy, /Matthew Finley/);
+  assert.match(privacy, /not end-to-end encrypted/i);
+  assert.doesNotMatch(privacy, /@gmail\.com/i);
+  assert.doesNotMatch(privacy, /\b\d{3}[-.\s]\d{3}[-.\s]\d{4}\b/);
+});
+
+test('unread marker, photo roll, and drafts', () => {
+  const messages = [
+    { id: 1, kind: 'text', body: 'hi', file_path: null },
+    { id: 2, kind: 'photo', body: '', file_path: 'frog/a.jpg' },
+    { id: 3, kind: 'voice', body: '', file_path: 'frog/a.m4a' },
+    { id: 4, kind: 'photo', body: 'lily', file_path: 'hailey/b.jpg' },
+  ];
+  assert.equal(logic.firstUnreadId(messages, null), null);
+  assert.equal(logic.firstUnreadId(messages, 4), null);
+  assert.equal(logic.firstUnreadId(messages, 1), 2);
+  assert.equal(logic.firstUnreadId(messages, 0), 1);
+  assert.deepEqual(logic.photoRoll(messages).map((row) => row.id), [4, 2]);
+  const store = new Map();
+  const memory = {
+    getItem: (key) => (store.has(key) ? store.get(key) : null),
+    setItem: (key, value) => store.set(key, value),
+    removeItem: (key) => store.delete(key),
+  };
+  logic.saveDraft(memory, 'frog', '  pond  ');
+  assert.equal(logic.loadDraft(memory, 'frog'), '  pond  ');
+  logic.saveDraft(memory, 'frog', '');
+  assert.equal(logic.loadDraft(memory, 'frog'), '');
+  logic.saveDraft(memory, 'frog', 'x'.repeat(9000));
+  assert.equal(logic.loadDraft(memory, 'frog').length, 8000);
+});
+
 test('the migration is additive and keeps reactions behind RLS', () => {
   const root = path.join(__dirname, '..', 'supabase');
   const migration = fs.readFileSync(path.join(root, 'migrations', '20261115_reactions_replies_edits.sql'), 'utf8');
@@ -63,4 +110,14 @@ test('the migration is additive and keeps reactions behind RLS', () => {
   assert.doesNotMatch(migration, /delete from public\.profiles/i);
   assert.match(migration, /add column if not exists reply_to/);
   assert.match(migration, /add column if not exists edited_at/);
+  const lock = fs.readFileSync(path.join(root, 'migrations', '20261115060000_private_helpers_and_force_rls.sql'), 'utf8');
+  for (const sql of [setup, lock]) {
+    assert.match(sql, /function private\.is_member/);
+    assert.match(sql, /edited_at is null/);
+    assert.match(sql, /force row level security/);
+    assert.match(sql, /revoke all on schema private from public, anon/);
+    assert.match(sql, /drop function if exists public\.is_member/);
+    assert.doesNotMatch(sql, /create or replace function public\.is_member/);
+    assert.doesNotMatch(sql, /drop table/i);
+  }
 });

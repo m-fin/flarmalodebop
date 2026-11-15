@@ -33,16 +33,22 @@ create table if not exists public.profiles (
 );
 alter table public.profiles enable row level security;
 
--- Membership check used by every policy
-create or replace function public.is_member()
+-- Membership check used by every policy.
+-- Lives in a schema the Data API does not expose. authenticated can execute it
+-- only so row-level policies can call it; it is not an RPC.
+create schema if not exists private;
+revoke all on schema private from public, anon;
+grant usage on schema private to authenticated, service_role;
+
+create or replace function private.is_member()
 returns boolean language sql stable security definer set search_path = ''
 as $$ select exists (select 1 from public.profiles where id = (select auth.uid())) $$;
-revoke execute on function public.is_member() from public, anon;
-grant execute on function public.is_member() to authenticated, service_role;
+revoke all on function private.is_member() from public, anon;
+grant execute on function private.is_member() to authenticated, service_role;
 
 -- Block any auth user whose email is not on the invite list (defense in depth;
 -- also turn OFF "Allow new users to sign up" in Auth settings).
-create or replace function public.flarm_guard_auth_user()
+create or replace function private.flarm_guard_auth_user()
 returns trigger language plpgsql security definer set search_path = ''
 as $$
 begin
@@ -51,14 +57,14 @@ begin
   end if;
   return new;
 end $$;
-revoke execute on function public.flarm_guard_auth_user() from public, anon, authenticated;
+revoke all on function private.flarm_guard_auth_user() from public, anon, authenticated;
 drop trigger if exists flarm_guard_auth_user on auth.users;
 create trigger flarm_guard_auth_user
   before insert or update of email on auth.users
-  for each row execute function public.flarm_guard_auth_user();
+  for each row execute function private.flarm_guard_auth_user();
 
 -- Auto-create the profile when an invited auth user is created
-create or replace function public.flarm_create_profile()
+create or replace function private.flarm_create_profile()
 returns trigger language plpgsql security definer set search_path = ''
 as $$
 begin
@@ -67,11 +73,11 @@ begin
   on conflict (id) do nothing;
   return new;
 end $$;
-revoke execute on function public.flarm_create_profile() from public, anon, authenticated;
+revoke all on function private.flarm_create_profile() from public, anon, authenticated;
 drop trigger if exists flarm_create_profile on auth.users;
 create trigger flarm_create_profile
   after insert on auth.users
-  for each row execute function public.flarm_create_profile();
+  for each row execute function private.flarm_create_profile();
 
 -- Remove the throwaway account an early smoke test created before this guard existed (no access anyway)
 delete from auth.users where email like 'smoke-%@example.com';
@@ -84,7 +90,7 @@ on conflict (id) do nothing;
 
 drop policy if exists "members read profiles" on public.profiles;
 create policy "members read profiles" on public.profiles
-  for select to authenticated using ((select public.is_member()));
+  for select to authenticated using ((select private.is_member()));
 revoke all on public.profiles from anon;
 revoke insert, update, delete, truncate on public.profiles from authenticated;
 grant select on public.profiles to authenticated;
@@ -111,19 +117,14 @@ alter table public.messages enable row level security;
 
 drop policy if exists "members read messages" on public.messages;
 create policy "members read messages" on public.messages
-  for select to authenticated using ((select public.is_member()));
+  for select to authenticated using ((select private.is_member()));
 
-drop policy if exists "members send as themselves" on public.messages;
-create policy "members send as themselves" on public.messages
-  for insert to authenticated with check (
-    (select public.is_member())
-    and sender = (select auth.uid())
-    and (file_path is null or split_part(file_path, '/', 1) = (select auth.uid())::text)
-  );
+-- Insert policy is created after reply_to / edited_at exist, so a new row
+-- cannot pretend to be an edit. See "members send as themselves" below.
 
 drop policy if exists "members unsend own" on public.messages;
 create policy "members unsend own" on public.messages
-  for delete to authenticated using ((select public.is_member()) and sender = (select auth.uid()));
+  for delete to authenticated using ((select private.is_member()) and sender = (select auth.uid()));
 
 revoke all on public.messages from anon;
 revoke update, truncate on public.messages from authenticated;
@@ -136,6 +137,17 @@ alter table public.messages
   add column if not exists edited_at timestamptz;
 create index if not exists messages_reply_to_idx on public.messages (reply_to);
 
+-- A member sends only as themselves, only into their own media folder,
+-- and cannot stamp edited_at. Edits go through edit_message().
+drop policy if exists "members send as themselves" on public.messages;
+create policy "members send as themselves" on public.messages
+  for insert to authenticated with check (
+    (select private.is_member())
+    and sender = (select auth.uid())
+    and edited_at is null
+    and (file_path is null or split_part(file_path, '/', 1) = (select auth.uid())::text)
+  );
+
 -- Members can change only the words of their own text messages.
 create or replace function public.edit_message(p_id bigint, p_body text)
 returns public.messages
@@ -146,7 +158,7 @@ as $$
 declare
   v_row public.messages;
 begin
-  if not public.is_member() then
+  if not private.is_member() then
     raise exception 'not allowed';
   end if;
   if p_body is null or char_length(btrim(p_body)) = 0 or char_length(p_body) > 8000 then
@@ -169,17 +181,18 @@ revoke all on function public.edit_message(bigint, text) from public, anon;
 grant execute on function public.edit_message(bigint, text) to authenticated;
 
 -- Sending a message counts as reading everything up to it
-create or replace function public.flarm_after_message()
+create or replace function private.flarm_after_message()
 returns trigger language plpgsql security definer set search_path = ''
 as $$
 begin
   update public.profiles set last_read = new.id where id = new.sender and last_read < new.id;
   return new;
 end $$;
-revoke execute on function public.flarm_after_message() from public, anon, authenticated;
+revoke all on function private.flarm_after_message() from public, anon;
+grant execute on function private.flarm_after_message() to authenticated;
 drop trigger if exists flarm_after_message on public.messages;
 create trigger flarm_after_message after insert on public.messages
-  for each row execute function public.flarm_after_message();
+  for each row execute function private.flarm_after_message();
 
 -- Read receipts: members can only move their own pointer forward
 create or replace function public.mark_read(p_id bigint)
@@ -187,7 +200,7 @@ returns void language plpgsql security definer set search_path = ''
 as $$
 declare v_target bigint;
 begin
-  if not public.is_member() then raise exception 'not allowed'; end if;
+  if not private.is_member() then raise exception 'not allowed'; end if;
   select least(p_id, coalesce(max(id), 0)) into v_target from public.messages;
   update public.profiles set last_read = v_target where id = auth.uid() and last_read < v_target;
 end $$;
@@ -209,7 +222,7 @@ alter table public.message_reactions enable row level security;
 drop policy if exists "members read reactions" on public.message_reactions;
 create policy "members read reactions" on public.message_reactions
   for select to authenticated
-  using ((select public.is_member()));
+  using ((select private.is_member()));
 
 revoke all on public.message_reactions from anon, authenticated;
 grant select on public.message_reactions to authenticated;
@@ -221,7 +234,7 @@ security definer
 set search_path = ''
 as $$
 begin
-  if not public.is_member() then
+  if not private.is_member() then
     raise exception 'not allowed';
   end if;
   if not exists (select 1 from public.messages where id = p_message) then
@@ -258,8 +271,8 @@ alter table public.push_subscriptions enable row level security;
 drop policy if exists "own push subscriptions" on public.push_subscriptions;
 create policy "own push subscriptions" on public.push_subscriptions
   for all to authenticated
-  using ((select public.is_member()) and user_id = (select auth.uid()))
-  with check ((select public.is_member()) and user_id = (select auth.uid()));
+  using ((select private.is_member()) and user_id = (select auth.uid()))
+  with check ((select private.is_member()) and user_id = (select auth.uid()));
 revoke all on public.push_subscriptions from anon;
 grant select, insert, update, delete on public.push_subscriptions to authenticated;
 
@@ -274,7 +287,7 @@ create or replace function public.heartbeat()
 returns void language plpgsql security definer set search_path = ''
 as $$
 begin
-  if not public.is_member() then raise exception 'not allowed'; end if;
+  if not private.is_member() then raise exception 'not allowed'; end if;
   insert into public.activity (user_id, active_at) values (auth.uid(), now())
   on conflict (user_id) do update set active_at = now();
 end $$;
@@ -304,11 +317,11 @@ end $$;
 drop policy if exists "flarm members receive" on realtime.messages;
 create policy "flarm members receive" on realtime.messages
   for select to authenticated
-  using ((select public.is_member()) and (select realtime.topic()) = 'flarm:room');
+  using ((select private.is_member()) and (select realtime.topic()) = 'flarm:room');
 drop policy if exists "flarm members send" on realtime.messages;
 create policy "flarm members send" on realtime.messages
   for insert to authenticated
-  with check ((select public.is_member()) and (select realtime.topic()) = 'flarm:room');
+  with check ((select private.is_member()) and (select realtime.topic()) = 'flarm:room');
 
 -- ---------------------------------------------------------------------
 -- 6. Storage: private "media" bucket for photos + voice notes
@@ -325,19 +338,43 @@ on conflict (id) do update set public = false,
 drop policy if exists "flarm members read media" on storage.objects;
 create policy "flarm members read media" on storage.objects
   for select to authenticated
-  using (bucket_id = 'media' and (select public.is_member()));
+  using (bucket_id = 'media' and (select private.is_member()));
 
 drop policy if exists "flarm members upload to own folder" on storage.objects;
 create policy "flarm members upload to own folder" on storage.objects
   for insert to authenticated
-  with check (bucket_id = 'media' and (select public.is_member())
+  with check (bucket_id = 'media' and (select private.is_member())
               and (storage.foldername(name))[1] = (select auth.uid())::text);
 
 drop policy if exists "flarm members delete own media" on storage.objects;
 create policy "flarm members delete own media" on storage.objects
   for delete to authenticated
-  using (bucket_id = 'media' and (select public.is_member())
+  using (bucket_id = 'media' and (select private.is_member())
          and (storage.foldername(name))[1] = (select auth.uid())::text);
+
+-- The Data API roles cannot bypass these policies by owning the tables.
+alter table public.allowed_members force row level security;
+alter table public.profiles force row level security;
+alter table public.messages force row level security;
+alter table public.message_reactions force row level security;
+alter table public.push_subscriptions force row level security;
+alter table public.activity force row level security;
+
+-- Older installs kept these helpers in public, which the Data API exposes.
+-- Triggers now call the private copies. Drop the public ones if they remain.
+drop function if exists public.is_member();
+drop function if exists public.flarm_after_message();
+drop function if exists public.flarm_guard_auth_user();
+drop function if exists public.flarm_create_profile();
+
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'supabase_auth_admin') then
+    grant usage on schema private to supabase_auth_admin;
+    grant execute on function private.flarm_guard_auth_user() to supabase_auth_admin;
+    grant execute on function private.flarm_create_profile() to supabase_auth_admin;
+  end if;
+end $$;
 
 -- Done. Quick check (should list 2 rows after the users file has run):
 select username, display from public.profiles order by username;

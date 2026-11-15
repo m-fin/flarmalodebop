@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { formatClock, formatDay, formatDur, isEmojiOnly, messageTime } from '@/lib/format';
 import { receiptFor } from '@/lib/goose';
-import { groupReactions, replySnippet, resolveReply } from '@/lib/thread';
+import { firstUnreadId, groupReactions, replySnippet, resolveReply } from '@/lib/thread';
 import { palette, useTheme } from '@/lib/theme';
 import type { Message, Profile, Reaction } from '@/lib/types';
 
@@ -26,6 +26,7 @@ type Props = {
   loading: boolean;
   focused: boolean;
   highlightId: number | null;
+  readAtOpen: number | null;
   onLoadOlder: () => void;
   onShowLatest: () => void;
   onOpenPhoto: (uri: string) => void;
@@ -41,6 +42,7 @@ type Props = {
 export function MessageList(props: Props) {
   const theme = useTheme();
   const receipt = receiptFor(props.messages, props.me.id, props.otherRead);
+  const unreadId = firstUnreadId(props.messages, props.readAtOpen);
   return (
     <FlatList
       ref={props.listRef}
@@ -87,6 +89,13 @@ export function MessageList(props: Props) {
         return (
           <View>
             {showDay ? <Text style={[styles.day, { color: theme.muted }]}>{formatDay(item.created_at)}</Text> : null}
+            {item.id === unreadId ? (
+              <View style={styles.unread}>
+                <View style={[styles.unreadLine, { backgroundColor: palette.sun }]} />
+                <Text style={styles.unreadText}>new notes</Text>
+                <View style={[styles.unreadLine, { backgroundColor: palette.sun }]} />
+              </View>
+            ) : null}
             <Bubble
               message={item}
               mine={item.sender === props.me.id}
@@ -298,6 +307,9 @@ const styles = StyleSheet.create({
   emptyMark: { fontSize: 64, color: palette.sun },
   emptyText: { textAlign: 'center', fontFamily: 'Fredoka_500Medium', fontSize: 17, lineHeight: 24 },
   day: { textAlign: 'center', fontFamily: 'Fredoka_500Medium', fontSize: 12, letterSpacing: 0.6, textTransform: 'uppercase', marginVertical: 10 },
+  unread: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 12 },
+  unreadLine: { flex: 1, height: 1, opacity: 0.8 },
+  unreadText: { fontFamily: 'Fredoka_600SemiBold', fontSize: 12, letterSpacing: 0.8, textTransform: 'uppercase', color: palette.sun },
   row: { maxWidth: '100%', marginVertical: 2 },
   mine: { alignItems: 'flex-end' },
   theirs: { alignItems: 'flex-start' },

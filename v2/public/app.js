@@ -12,7 +12,7 @@ const state = {
   sound: localStorage.sound !== 'off', online: false, preview: previewing,
   reactions: new Map(), menuId: null, confirmUnsend: null, reply: null, editing: null,
   appearance: localStorage.appearance || 'dusk', messageSelect: '*, reply:reply_to(id, sender, kind, body)',
-  focused: false,
+  focused: false, readAtOpen: null,
 };
 const configured = CFG.SUPABASE_URL && !CFG.SUPABASE_URL.startsWith('__') && CFG.SUPABASE_ANON_KEY && !CFG.SUPABASE_ANON_KEY.startsWith('__');
 const sb = configured ? window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY, {
@@ -168,6 +168,9 @@ async function showChat() {
   $('#meLine').textContent = `Signed in as ${state.me.display}`;
   setPresence(false);
   state.msgs.clear(); $('#list').innerHTML = ''; state.newest = 0; state.oldest = null;
+  state.readAtOpen = Number(state.me.last_read) || 0;
+  const savedDraft = state.preview ? '' : L.loadDraft(localStorage, state.me.id);
+  if (savedDraft && !ta.value) { ta.value = savedDraft; ta.dispatchEvent(new Event('input')); }
   const rows = await fetchPage();
   rows.forEach(m => addMsg(m, false));
   await loadReactions(rows.map(m => m.id));
@@ -253,17 +256,17 @@ function onForeground() {
   if (state.room && state.room.state === 'joined') state.room.track({ at: Date.now() });
   else if (state.me) connect();
 }
-document.addEventListener('visibilitychange', () => { if (chatVisible()) onForeground(); });
-window.addEventListener('focus', () => { if (chatVisible()) onForeground(); });
-window.addEventListener('online', () => { if (state.me) { connect(); catchUp(); heartbeat(); } });
+document.addEventListener('visibilitychange', () => { if (!state.preview && chatVisible()) onForeground(); });
+window.addEventListener('focus', () => { if (!state.preview && chatVisible()) onForeground(); });
+window.addEventListener('online', () => { if (state.me && !state.preview) { connect(); catchUp(); heartbeat(); } });
 // Poll so messages and read receipts still land if the private realtime channel drops.
 setInterval(() => {
-  if (!chatVisible()) return;
+  if (state.preview || !chatVisible()) return;
   heartbeat();
   catchUp();
   if (state.room && state.room.state !== 'joined') connect();
 }, 10000);
-function heartbeat() { sb.rpc('heartbeat').then(() => {}, () => {}); }
+function heartbeat() { if (state.preview || !sb) return; sb.rpc('heartbeat').then(() => {}, () => {}); }
 function setPresence(on) { state.online = on; $('#status').classList.toggle('on', !!on); $('#statusText').textContent = on ? 'here now ♪' : 'away'; }
 let typingTimer;
 function showTyping(on) {
@@ -359,10 +362,14 @@ function render() {
   const list = $('#list'); list.innerHTML = '';
   const msgs = [...state.msgs.values()].sort((a, b) => a.id - b.id);
   $('#empty').classList.toggle('hidden', msgs.length > 0);
+  const unreadId = L.firstUnreadId(msgs, state.readAtOpen);
   let lastDay = '', prev = null;
   for (const m of msgs) {
     const t = ts(m), day = new Date(t).toDateString();
     if (day !== lastDay) { const d = document.createElement('div'); d.className = 'day'; d.textContent = fmtDay(t); list.append(d); lastDay = day; prev = null; }
+    if (m.id === unreadId) {
+      const mark = document.createElement('div'); mark.className = 'unread'; mark.textContent = 'new notes'; list.append(mark);
+    }
     const mine = m.sender === state.me.id;
     const el = document.createElement('div');
     el.className = 'msg ' + (mine ? 'me' : 'them');
@@ -541,6 +548,7 @@ let typingSent = false, typingIdle;
 function sendTyping(on) { if (state.room) state.room.send({ type: 'broadcast', event: 'typing', payload: { user: state.me.id, on } }); typingSent = on; }
 ta.addEventListener('input', () => {
   ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 140) + 'px';
+  if (state.me && !state.editing && !state.preview) L.saveDraft(localStorage, state.me.id, ta.value);
   const has = ta.value.trim().length > 0;
   $('#sendBtn').classList.toggle('hidden', !has); $('#micBtn').classList.toggle('hidden', has);
   if (has && !typingSent) sendTyping(true);
@@ -777,7 +785,46 @@ function b64ToU8(s) { const p = '='.repeat((4 - s.length % 4) % 4); const r = at
 
 if (sb) sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT' && !state.preview) showLogin(); if (ev === 'TOKEN_REFRESHED' && state.room) sb.realtime.setAuth(); });
 
-$('#composeCancel').onclick = () => { const was = state.editing; clearCompose(); if (was) { ta.value = ''; ta.dispatchEvent(new Event('input')); } render(); };
+$('#composeCancel').onclick = () => {
+  const was = state.editing;
+  clearCompose();
+  if (was) {
+    ta.value = state.me && !state.preview ? L.loadDraft(localStorage, state.me.id) : '';
+    ta.dispatchEvent(new Event('input'));
+  }
+  render();
+};
+function openPhotos() {
+  const grid = $('#photoGrid');
+  grid.replaceChildren();
+  const photos = L.photoRoll([...state.msgs.values()]);
+  $('#photosSheet').classList.remove('hidden');
+  if (!photos.length) {
+    const empty = document.createElement('p');
+    empty.className = 'muted';
+    empty.textContent = 'No photos in this stretch of the thread yet.';
+    grid.append(empty);
+    return;
+  }
+  photos.forEach(m => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'photo-tile';
+    const img = new Image();
+    img.alt = m.body || 'photo';
+    signedUrl(m.file_path).then(u => { img.src = u; }).catch(() => { img.alt = 'photo unavailable'; });
+    btn.append(img);
+    btn.onclick = () => {
+      if (!img.src) return;
+      $('#viewer img').src = img.src;
+      $('#viewer').classList.remove('hidden');
+    };
+    grid.append(btn);
+  });
+}
+$('#photosBtn').onclick = openPhotos;
+$('#closePhotos').onclick = () => $('#photosSheet').classList.add('hidden');
+$('#photosSheet').onclick = e => { if (e.target.id === 'photosSheet') $('#photosSheet').classList.add('hidden'); };
 $('#searchBtn').onclick = () => { $('#searchSheet').classList.remove('hidden'); $('#searchInput').value = ''; $('#searchResults').innerHTML = ''; $('#searchInput').focus(); };
 $('#closeSearch').onclick = () => $('#searchSheet').classList.add('hidden');
 $('#searchSheet').onclick = e => { if (e.target.id === 'searchSheet') $('#searchSheet').classList.add('hidden'); };

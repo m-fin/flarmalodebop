@@ -15,6 +15,7 @@ type Props = {
   onToggleSound: () => void;
   onCycleAppearance: () => void;
   onEnablePush: () => void;
+  onPrivacy: () => void;
   onSignOut: () => void;
 };
 
@@ -36,6 +37,9 @@ export function SettingsSheet(props: Props) {
           </Pressable>
           <Pressable style={[styles.row, { backgroundColor: theme.card }]} onPress={props.onCycleAppearance}>
             <Text style={[styles.rowText, { color: theme.text }]}>🌗 Appearance: {props.appearanceLabel}</Text>
+          </Pressable>
+          <Pressable style={[styles.row, { backgroundColor: theme.card }]} onPress={props.onPrivacy}>
+            <Text style={[styles.rowText, { color: theme.text }]}>Privacy policy</Text>
           </Pressable>
           <Pressable style={[styles.row, { backgroundColor: theme.card }]} onPress={props.onSignOut}>
             <Text style={[styles.rowText, { color: theme.danger }]}>Sign out</Text>

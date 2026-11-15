@@ -88,6 +88,14 @@ button, input, textarea { font: inherit; color: inherit; }
 .empty { text-align: center; opacity: .8; margin-top: 18vh; }
 .empty .big { font-size: 64px; color: var(--sun); animation: bob 2.4s ease-in-out infinite; }
 .day { text-align: center; font-size: 12px; opacity: .6; margin: 16px 0 8px; letter-spacing: .04em; text-transform: uppercase; }
+.unread { display: flex; align-items: center; gap: 10px; margin: 14px 8px; color: var(--sun); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
+.unread::before, .unread::after { content: ''; flex: 1; height: 1px; background: color-mix(in srgb, var(--sun) 70%, transparent); }
+.legal { margin: 18px 0 0; text-align: center; font-size: 13px; }
+.legal a, a.btn-row { color: inherit; text-decoration: none; }
+.legal a { color: var(--sun); }
+.photo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 12px 0 8px; }
+.photo-tile { border: 0; padding: 0; border-radius: 12px; overflow: hidden; aspect-ratio: 1; background: var(--chip); cursor: pointer; }
+.photo-tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .msg { display: flex; flex-direction: column; margin: 2px 0; max-width: 100%; }
 .msg.me { align-items: flex-end; } .msg.them { align-items: flex-start; }
 .msg.gap { margin-top: 12px; }

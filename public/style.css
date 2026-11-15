@@ -51,6 +51,8 @@ button, input, textarea { font: inherit; color: inherit; }
 .btn-primary { width: 100%; margin-top: 12px; padding: 16px; border: 0; border-radius: 18px; background: var(--me); font-weight: 700; font-size: 18px; box-shadow: 0 10px 30px rgba(255,94,138,.35); cursor: pointer; }
 .btn-primary:active { transform: scale(.98); }
 .err { color: #ffb4c4; min-height: 1.4em; }
+.legal { margin: 18px 0 0; text-align: center; font-size: 13px; }
+.legal a { color: var(--sun); }
 
 /* header */
 .top { display: flex; align-items: center; gap: 12px; padding: calc(var(--sat) + 10px) calc(var(--sar) + 14px) 10px calc(var(--sal) + 14px);
