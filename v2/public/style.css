@@ -216,6 +216,42 @@ button, input, textarea { font: inherit; color: inherit; }
 .hit-text { font-size: 15px; }
 .msg.flash .bubble { animation: flash 1.1s ease; }
 @keyframes flash { 30% { filter: brightness(1.35); } }
+.meetup-banner { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; margin: 8px 12px 0; padding: 10px 14px; border: 0; border-radius: 18px; text-align: left; cursor: pointer;
+  background: linear-gradient(135deg, rgba(255,200,97,.22), rgba(255,94,138,.18)); color: var(--text); box-shadow: inset 0 0 0 1px rgba(255,200,97,.45); }
+.banner-kicker { font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--sun); font-weight: 700; }
+.banner-detail { font-size: 16px; }
+.banner-ride, .meetup-ride { font-size: 13px; opacity: .8; }
+.msg.meetup-row { align-items: stretch; }
+.msg.meetup-row .bubble.meetup { max-width: 100%; width: 100%; background: var(--sheet); color: var(--text); border-radius: 22px; padding: 12px; }
+.meetup-card { display: flex; flex-direction: column; gap: 6px; }
+.meetup-kicker { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--sun); }
+.meetup-spot { font-size: 20px; font-weight: 700; }
+.meetup-when { font-size: 15px; }
+.meetup-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.meetup-yes { border: 0; border-radius: 999px; padding: 8px 14px; background: var(--me); color: white; font-weight: 700; cursor: pointer; }
+.meetup-yes.ghost { background: transparent; color: var(--text); box-shadow: inset 0 0 0 1.5px var(--sun); }
+.meetup-wait, .chip-hint { font-size: 12px; opacity: .75; }
+.meetup-fallback { margin: 0; white-space: pre-wrap; }
+.calendar-scroll { flex: 1; overflow: auto; padding: 12px 14px calc(var(--sab) + 24px); display: flex; flex-direction: column; gap: 10px; }
+.cal-banner, .shift-pill, .shift-edit { background: var(--chip); border-radius: 16px; padding: 10px 12px; }
+.cal-heading { margin: 4px 0 0; font-size: 22px; }
+.cal-kicker { margin: 8px 0 0; font-size: 13px; letter-spacing: .04em; text-transform: uppercase; color: var(--sun); }
+.week-row, .chip-row, .shift-cols, .inline-form, .shift-edit { display: flex; gap: 8px; align-items: center; }
+.week-row, .chip-row, .inline-form { flex-wrap: wrap; }
+.shift-cols { align-items: stretch; }
+.shift-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.shift-who { font-weight: 700; }
+.day-chip, .chip-btn, .choice-chip { border: 0; background: var(--chip); color: var(--text); border-radius: 16px; padding: 8px 10px; cursor: pointer; }
+.day-chip { white-space: pre-line; min-width: 52px; text-align: center; line-height: 1.15; }
+.day-chip.on, .chip-btn.on, .choice-chip.on { box-shadow: inset 0 0 0 2px var(--sun); background: rgba(255,200,97,.16); }
+.day-chip.today { color: var(--sun); }
+.day-chip.locked { box-shadow: inset 0 0 0 2px var(--mint); }
+.choice-chip { display: flex; flex-direction: column; align-items: flex-start; text-align: left; }
+.inline-form input, .wide-input { flex: 1; min-width: 0; padding: 12px 14px; border-radius: 14px; border: 2px solid var(--input-border); background: var(--input-bg); }
+.wide-input { width: 100%; }
+.chip-x { margin-left: 6px; border: 0; background: transparent; color: var(--danger); cursor: pointer; }
+.cal-go { margin-top: 4px; }
+.shift-edit span { flex: 1; }
 html[data-theme="light"] .them .bubble { background: #fff; box-shadow: 0 6px 18px rgba(42,18,64,.08); }
 html[data-theme="light"] .status { opacity: .85; }
 html[data-theme="light"] .day, html[data-theme="light"] .meta { color: var(--muted); opacity: 1; }

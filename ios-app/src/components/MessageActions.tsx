@@ -1,5 +1,5 @@
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { REACTIONS } from '@/lib/thread';
+import { canEdit, REACTIONS } from '@/lib/thread';
 import { palette, useTheme } from '@/lib/theme';
 import type { Message } from '@/lib/types';
 
@@ -55,7 +55,7 @@ export function MessageActions(props: Props) {
                   <Text style={[styles.actionText, { color: theme.text }]}>Copy</Text>
                 </Pressable>
               ) : null}
-              {props.mine && message?.kind === 'text' ? (
+              {message && canEdit(message, message.sender) && props.mine ? (
                 <Pressable style={[styles.action, { backgroundColor: theme.card }]} onPress={props.onEdit}>
                   <Text style={[styles.actionText, { color: theme.text }]}>Edit</Text>
                 </Pressable>

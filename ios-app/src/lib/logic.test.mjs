@@ -76,6 +76,7 @@ test('search pattern escapes like wildcards and edit rights stay with the author
   const mine = { kind: 'text', sender: 'frog' };
   assert.equal(canEdit(mine, 'frog'), true);
   assert.equal(canEdit({ kind: 'photo', sender: 'frog' }, 'frog'), false);
+  assert.equal(canEdit({ kind: 'text', sender: 'frog', meta: { flarm: 'meetup' } }, 'frog'), false);
   assert.equal(canEdit(mine, 'hailey'), false);
   assert.equal(canUnsend({ sender: 'frog' }, 'frog'), true);
   assert.equal(canUnsend({ sender: 'frog' }, 'hailey'), false);

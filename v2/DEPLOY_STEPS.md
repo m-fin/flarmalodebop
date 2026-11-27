@@ -16,7 +16,7 @@ Files on the box:
 2. Paste the **entire** contents of `v2/supabase/setup.sql` → **Run**. If it asks to confirm "destructive operation", confirm: the only delete removes a stray throwaway `smoke-…@example.com` test user.
 3. Expected: "Success", with a final result table `username | display` that has **0 rows** (the users don't exist yet). The script is idempotent, so it's safe to re-run.
 
-Already deployed an older `setup.sql`? Either re-run the current `setup.sql`, or paste the migrations in filename order and stop. `20261115_reactions_replies_edits.sql` adds replies, edits, and reactions. `20261115060000_private_helpers_and_force_rls.sql` moves internal functions out of the exposed schema and forces row level security. Do not run the reactions file again after the lock-down file. Existing messages, profiles, media, and push rows stay as they are.
+Already deployed an older `setup.sql`? Either re-run the current `setup.sql`, or paste the migrations in filename order and stop. `20261115_reactions_replies_edits.sql` adds replies, edits, and reactions. `20261115060000_private_helpers_and_force_rls.sql` moves internal functions out of the exposed schema and forces row level security. Do not run the reactions file again after the lock-down file. Then run `20261127120000_shared_calendar_restaurant_meetups.sql` for the shared calendar and daily restaurant meetups. Existing messages, profiles, media, and push rows stay as they are.
 
 The public privacy policy is `v2/public/privacy.html`. After deploy it is `https://<your-host>/privacy.html`. Use that URL in App Store Connect.
 
@@ -31,7 +31,7 @@ The users are inserted straight into `auth.users`, so this works whether signups
 ## 3. Lock down Auth and Realtime (Supabase)
 1. **Authentication → Sign In / Providers**: toggle **"Allow new users to sign up" OFF** → **Save**. Keep the Email provider enabled and "Confirm email" OFF.
 2. **Authentication → URL Configuration** → Site URL = the Vercel URL from step 4 (optional; no emails are sent).
-3. **Realtime → Settings**: turn **"Allow public access" OFF** if the toggle exists, then Save. The app only uses the private channel `flarm:room`.
+3. **Realtime → Settings**: turn **"Allow public access" OFF** if the toggle exists, then Save. The app uses the private channels `flarm:room` (the thread) and `flarm:calendar` (shifts and restaurant meetups).
 
 As a second layer, a database trigger rejects any auth user whose email isn't one of the two, even if signups get switched back on.
 

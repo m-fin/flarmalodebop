@@ -6,13 +6,14 @@ const EMAIL = { frog: 'frog@flarmalodebop.app', hailey: 'hailey@flarmalodebop.ap
 const ROOM = 'flarm:room';
 const BUCKET = 'media';
 const L = window.FlarmLogic;
+const C = window.FlarmCalendar;
 const previewing = new URLSearchParams(location.search).get('preview') === '1';
 const state = {
   me: null, other: null, msgs: new Map(), oldest: null, newest: 0, otherRead: 0, room: null,
   sound: localStorage.sound !== 'off', online: false, preview: previewing,
   reactions: new Map(), menuId: null, confirmUnsend: null, reply: null, editing: null,
   appearance: localStorage.appearance || 'dusk', messageSelect: '*, reply:reply_to(id, sender, kind, body)',
-  focused: false, readAtOpen: null,
+  focused: false, readAtOpen: null, calendar: C.emptyCalendar(),
 };
 const configured = CFG.SUPABASE_URL && !CFG.SUPABASE_URL.startsWith('__') && CFG.SUPABASE_ANON_KEY && !CFG.SUPABASE_ANON_KEY.startsWith('__');
 const sb = configured ? window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY, {
@@ -175,7 +176,7 @@ async function showChat() {
   rows.forEach(m => addMsg(m, false));
   await loadReactions(rows.map(m => m.id));
   $('#loadOlder').classList.toggle('hidden', rows.length < 60);
-  render(); scrollBottom(true); connect(); markRead(); heartbeat();
+  render(); scrollBottom(true); connect(); connectCalendar(); loadCalendar(); markRead(); heartbeat();
   updatePushUI();
 }
 async function messageQuery(apply) {
@@ -264,9 +265,43 @@ setInterval(() => {
   if (state.preview || !chatVisible()) return;
   heartbeat();
   catchUp();
+  loadCalendar();
   if (state.room && state.room.state !== 'joined') connect();
+  if (!state.calendarRoom || state.calendarRoom.state !== 'joined') connectCalendar();
 }, 10000);
 function heartbeat() { if (state.preview || !sb) return; sb.rpc('heartbeat').then(() => {}, () => {}); }
+async function loadCalendar() {
+  if (state.preview || !sb) return;
+  const [shifts, daysOff, spots, meetups] = await Promise.all([
+    sb.from('work_shifts').select('*'),
+    sb.from('shift_days_off').select('*'),
+    sb.from('favorite_spots').select('*'),
+    sb.from('restaurant_meetups').select('*'),
+  ]);
+  if ([shifts, daysOff, spots, meetups].some(res => res.error)) return;
+  state.calendar = C.calendarFromRows({ shifts: shifts.data, daysOff: daysOff.data, spots: spots.data, meetups: meetups.data });
+  window.FlarmCalendarUI.render();
+  render();
+}
+function applyCalendar(p, table) {
+  state.calendar = C.applyCalendarChange(state.calendar, { table, event: p.eventType || p.event, new: p.new, old: p.old });
+  window.FlarmCalendarUI.render();
+  if (table === 'restaurant_meetups') render();
+}
+async function connectCalendar() {
+  if (state.preview || !sb) return;
+  if (state.calendarRoom) await sb.removeChannel(state.calendarRoom);
+  const room = sb.channel('flarm:calendar', { config: { private: true } });
+  state.calendarRoom = room;
+  room
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'work_shifts' }, p => applyCalendar(p, 'work_shifts'))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'shift_days_off' }, p => applyCalendar(p, 'shift_days_off'))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'favorite_spots' }, p => applyCalendar(p, 'favorite_spots'))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'restaurant_meetups' }, p => applyCalendar(p, 'restaurant_meetups'))
+    .subscribe(status => {
+      if ((status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') && state.calendarRoom === room) loadCalendar();
+    });
+}
 function setPresence(on) { state.online = on; $('#status').classList.toggle('on', !!on); $('#statusText').textContent = on ? 'here now ♪' : 'away'; }
 let typingTimer;
 function showTyping(on) {
@@ -371,8 +406,9 @@ function render() {
       const mark = document.createElement('div'); mark.className = 'unread'; mark.textContent = 'new notes'; list.append(mark);
     }
     const mine = m.sender === state.me.id;
+    const meetup = C.isMeetupMessage(m);
     const el = document.createElement('div');
-    el.className = 'msg ' + (mine ? 'me' : 'them');
+    el.className = 'msg ' + (mine ? 'me' : 'them') + (meetup ? ' meetup-row' : '');
     if (!prev || prev.sender !== m.sender || t - ts(prev) > 5 * 60e3) el.classList.add('gap');
     if (fresh.has(m.id)) el.classList.add('new');
     if (state.flashId === m.id) el.classList.add('flash');
@@ -382,7 +418,8 @@ function render() {
     if (!b || m.kind === 'text') {
       b = document.createElement('div'); b.className = 'bubble';
       if (quote) b.append(quote);
-      if (m.kind === 'text') { const span = document.createElement('span'); span.textContent = m.body; b.append(span); if (isEmojiOnly(m.body) && !quote) b.classList.add('emoji'); }
+      if (meetup) { b.classList.add('meetup'); b.append(window.FlarmCalendarUI.card(m)); }
+      else if (m.kind === 'text') { const span = document.createElement('span'); span.textContent = m.body; b.append(span); if (isEmojiOnly(m.body) && !quote) b.classList.add('emoji'); }
       else if (m.kind === 'photo') b.append(...photoEls(m, b));
       else if (m.kind === 'voice') b.append(voiceEl(m));
       if (m.kind !== 'text') nodeCache.set(m.id, b);
@@ -398,7 +435,7 @@ function render() {
     bindMessage(el, m);
     list.append(el); prev = m;
   }
-  fresh.clear(); renderReceipt();
+  fresh.clear(); renderReceipt(); window.FlarmCalendarUI.renderBanner();
 }
 function quoteEl(m) {
   const target = L.resolveReply(m, state.msgs);
@@ -456,7 +493,7 @@ function actionTray(m) {
 let pressTimer = null, pressed = false;
 function bindMessage(el, m) {
   el.addEventListener('pointerdown', (e) => {
-    if (e.target.closest('.play, .quote, .react-chip, .actions')) return;
+    if (e.target.closest('.play, .quote, .react-chip, .actions, .meetup-card')) return;
     pressed = false;
     clearTimeout(pressTimer);
     pressTimer = setTimeout(() => { pressed = true; openMenu(m.id); }, 460);
@@ -468,8 +505,8 @@ function bindMessage(el, m) {
   el.addEventListener('contextmenu', (e) => { e.preventDefault(); openMenu(m.id); });
   el.addEventListener('click', (e) => {
     if (pressed) { pressed = false; return; }
-    if (e.target.closest('.play, .quote, .react-chip, .actions, img')) return;
-    if (m.kind === 'text') openMenu(state.menuId === m.id ? null : m.id);
+    if (e.target.closest('.play, .quote, .react-chip, .actions, img, .meetup-card')) return;
+    if (m.kind === 'text' && !C.isMeetupMessage(m)) openMenu(state.menuId === m.id ? null : m.id);
   });
   el.addEventListener('dblclick', (e) => {
     if (e.target.closest('.play, .actions')) return;
@@ -858,6 +895,112 @@ async function runSearch() {
     box.append(b);
   });
 }
+function rememberMeetup(row) {
+  if (!row) return;
+  const rows = Array.isArray(row) ? row : [row];
+  rows.forEach(item => {
+    if (item && item.id) state.calendar = C.applyCalendarChange(state.calendar, { table: 'restaurant_meetups', event: 'INSERT', new: item });
+  });
+  window.FlarmCalendarUI.render();
+  render();
+}
+async function proposeMeetup(payload) {
+  if (state.preview) { toast('Preview only — sign in to save a meetup'); return; }
+  const res = await sb.rpc('propose_meetup', { p_day: payload.day, p_start: payload.start, p_end: payload.end, p_spot: payload.spot, p_ride: payload.ride || '' });
+  if (res.error) throw res.error;
+  rememberMeetup(res.data);
+  catchUp();
+  toast('Proposed — waiting on a yes');
+}
+async function proposeMeetupDays(plans) {
+  if (state.preview) { toast('Preview only — sign in to save a meetup'); return; }
+  const res = await sb.rpc('propose_meetup_days', { p_days: plans.map(plan => ({ day: plan.day, start: plan.start, end: plan.end, spot: plan.spot, ride: plan.ride || '' })) });
+  if (res.error) throw res.error;
+  rememberMeetup(res.data);
+  catchUp();
+  toast('Proposed the open days');
+}
+async function confirmMeetup(id) {
+  if (state.preview) { toast('Preview only'); return; }
+  const res = await sb.rpc('confirm_meetup', { p_id: id });
+  if (res.error) throw res.error;
+  rememberMeetup(res.data);
+  catchUp();
+  toast('Locked in');
+}
+async function counterMeetup(id, spot, delta) {
+  if (state.preview) { toast('Preview only'); return; }
+  const res = await sb.rpc('counter_meetup', { p_id: id, p_spot: spot || null, p_delta: delta });
+  if (res.error) throw res.error;
+  rememberMeetup(res.data);
+  catchUp();
+}
+async function addShift(shift) {
+  const problem = C.validShift(shift);
+  if (problem) throw new Error(problem);
+  if (C.shiftConflict(state.calendar.shifts, shift)) throw new Error('That overlaps a shift you already saved');
+  if (state.preview) {
+    state.calendar = C.applyCalendarChange(state.calendar, { table: 'work_shifts', event: 'INSERT', new: { id: 'preview-' + Date.now(), user_id: shift.userId, weekday: shift.date ? null : shift.weekday, on_date: shift.date, start_minute: shift.start, end_minute: shift.end, label: shift.label } });
+    window.FlarmCalendarUI.render();
+    return;
+  }
+  const res = await sb.from('work_shifts').insert({ weekday: shift.date ? null : shift.weekday, on_date: shift.date || null, start_minute: shift.start, end_minute: shift.end, label: String(shift.label || '').trim() }).select('*').single();
+  if (res.error) throw res.error;
+  state.calendar = C.applyCalendarChange(state.calendar, { table: 'work_shifts', event: 'INSERT', new: res.data });
+  window.FlarmCalendarUI.render();
+}
+async function deleteShift(id) {
+  if (state.preview) {
+    state.calendar = C.applyCalendarChange(state.calendar, { table: 'work_shifts', event: 'DELETE', old: { id } });
+    window.FlarmCalendarUI.render();
+    return;
+  }
+  const res = await sb.from('work_shifts').delete().eq('id', id);
+  if (res.error) throw res.error;
+  state.calendar = C.applyCalendarChange(state.calendar, { table: 'work_shifts', event: 'DELETE', old: { id } });
+  window.FlarmCalendarUI.render();
+}
+async function setDayOff(day, off) {
+  if (state.preview) {
+    state.calendar = C.applyCalendarChange(state.calendar, { table: 'shift_days_off', event: off ? 'INSERT' : 'DELETE', new: { user_id: state.me.id, on_date: day }, old: { user_id: state.me.id, on_date: day } });
+    window.FlarmCalendarUI.render();
+    return;
+  }
+  const res = off
+    ? await sb.from('shift_days_off').upsert({ user_id: state.me.id, on_date: day }, { onConflict: 'user_id,on_date' })
+    : await sb.from('shift_days_off').delete().eq('user_id', state.me.id).eq('on_date', day);
+  if (res.error) throw res.error;
+  state.calendar = C.applyCalendarChange(state.calendar, { table: 'shift_days_off', event: off ? 'INSERT' : 'DELETE', new: { user_id: state.me.id, on_date: day }, old: { user_id: state.me.id, on_date: day } });
+  window.FlarmCalendarUI.render();
+}
+async function addSpot(name) {
+  const spot = C.normalizeSpot(name);
+  if (!spot) return;
+  if (C.PRESET_SPOTS.some(preset => preset.toLowerCase() === spot.toLowerCase())) { toast(spot + ' is already a quick pick'); return; }
+  if (state.preview) { toast('Preview only — sign in to save a spot'); return; }
+  const res = await sb.from('favorite_spots').insert({ name: spot }).select('*').single();
+  if (res.error) throw res.error;
+  state.calendar = C.applyCalendarChange(state.calendar, { table: 'favorite_spots', event: 'INSERT', new: res.data });
+  window.FlarmCalendarUI.render();
+}
+async function removeSpot(id) {
+  if (state.preview) return;
+  const res = await sb.from('favorite_spots').delete().eq('id', id);
+  if (res.error) throw res.error;
+  state.calendar = C.applyCalendarChange(state.calendar, { table: 'favorite_spots', event: 'DELETE', old: { id } });
+  window.FlarmCalendarUI.render();
+}
+function downloadIcs(meetup) {
+  const file = new Blob([C.meetupToIcs(meetup)], { type: 'text/calendar' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(file);
+  link.download = 'flarmo-' + meetup.day + '.ics';
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  toast('Calendar file downloaded');
+}
 function showPreview() {
   state.preview = true;
   state.me = { id: 'frog', username: 'frog', display: 'Frog', last_read: 4 };
@@ -875,12 +1018,40 @@ function showPreview() {
     { id: 1, sender: 'hailey', kind: 'text', body: 'the pond is loud today', file_path: null, created_at: now },
     { id: 2, sender: 'frog', kind: 'text', body: 'saving you a lily pad', file_path: null, created_at: now, reply_to: 1, edited_at: now, reply: { id: 1, sender: 'hailey', kind: 'text', body: 'the pond is loud today' } },
     { id: 4, sender: 'frog', kind: 'text', body: 'see you at the pond', file_path: null, created_at: now },
+    { id: 5, sender: 'hailey', kind: 'text', body: 'Daily Restaurant Meetup', file_path: null, created_at: now, meta: { flarm: 'meetup', meetup_id: 'preview-meet' } },
   ];
+  const day = C.todayIso();
+  state.calendar = C.calendarFromRows({
+    shifts: [
+      { id: 'p-frog', user_id: 'frog', weekday: C.weekdayOf(day), on_date: null, start_minute: 360, end_minute: 840, label: 'Morning' },
+      { id: 'p-hailey', user_id: 'hailey', weekday: C.weekdayOf(day), on_date: null, start_minute: 960, end_minute: 1320, label: 'Late' },
+    ],
+    spots: [],
+    daysOff: [],
+    meetups: [{ id: 'preview-meet', day, start_minute: 840, end_minute: 930, spot_name: 'Golden Corral', ride_note: 'Frog drives', status: 'confirmed', proposed_by: 'hailey', confirmed_by: 'frog', message_id: 5 }],
+  });
   state.msgs.clear();
   rows.forEach(m => addMsg(m, false));
   state.reactions.set(1, [{ message_id: 1, user_id: 'frog', emoji: '❤️' }, { message_id: 1, user_id: 'hailey', emoji: '🐸' }]);
   state.reactions.set(4, [{ message_id: 4, user_id: 'hailey', emoji: '🪿' }]);
   render(); scrollBottom(true); applyAppearance(state.appearance);
 }
+window.FlarmCalendarUI.init({
+  preview: () => state.preview,
+  me: () => state.me,
+  other: () => state.other,
+  calendar: () => state.calendar,
+  toast,
+  propose: proposeMeetup,
+  proposeDays: proposeMeetupDays,
+  confirm: confirmMeetup,
+  counter: counterMeetup,
+  addShift,
+  deleteShift,
+  setDayOff,
+  addSpot,
+  removeSpot,
+  downloadIcs,
+});
 window.__flarm = { waddleGoose, flockV, showPreview, applyAppearance, openMenu, startReply, focusMessage, L }; // handy for testing
 if (previewing) showPreview(); else boot();

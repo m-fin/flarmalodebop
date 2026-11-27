@@ -58,8 +58,13 @@ export function localSearch(messages: Message[], query: string): Message[] {
   return messages.filter((message) => message.body.toLowerCase().includes(q)).slice(-40).reverse();
 }
 
-export function canEdit(message: { kind: MessageKind; sender: string } | null | undefined, meId: string): boolean {
-  return !!message && message.kind === 'text' && message.sender === meId;
+export function canEdit(
+  message: { kind: MessageKind; sender: string; meta?: { flarm?: string } | null } | null | undefined,
+  meId: string,
+): boolean {
+  if (!message || message.kind !== 'text' || message.sender !== meId) return false;
+  if (message.meta?.flarm === 'meetup') return false;
+  return true;
 }
 
 export function canUnsend(message: { sender: string } | null | undefined, meId: string): boolean {

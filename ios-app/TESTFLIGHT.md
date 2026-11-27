@@ -1,6 +1,10 @@
 # Flarmalodebop on TestFlight
 
-The iPhone app lives in `ios-app/`. Bundle id `app.flarmalodebop.ios`. It talks to the same private Supabase project as the web app (`https://bpovuwrgvfzdeihpnssv.supabase.co`). Nothing here changes the database schema. Passwords stay out of the repo.
+The iPhone app lives in `ios-app/`. Bundle id `app.flarmalodebop.ios`, version `1.0.0`, build number `1` (EAS production auto-increments the build). The icon at `ios-app/assets/icon.png` is an opaque 1024×1024 PNG with no alpha channel. It talks to the same private Supabase project as the web app (`https://bpovuwrgvfzdeihpnssv.supabase.co`). Passwords stay out of the repo.
+
+Before the first build that includes the shared calendar, run `v2/supabase/migrations/20261127120000_shared_calendar_restaurant_meetups.sql` in the Supabase SQL editor if this project was created from an older `setup.sql`. Re-running the current `setup.sql` is the other option. That migration adds shifts, favorite restaurants, and restaurant meetups. It does not rewrite messages, profiles, or passwords.
+
+Calendar access is write-only: `NSCalendarsUsageDescription` and `NSCalendarsWriteOnlyAccessUsageDescription` say the app adds a confirmed restaurant meetup. The home-screen widget “Today’s Restaurant Meetup” is an app extension (`ios-app/targets/meetup`) in the same archive. It shares today’s locked-in meetup through the App Group `group.app.flarmalodebop.ios`. EAS should register that group when it creates the provisioning profile. If Apple asks you to enable App Groups on the App ID, accept it for both `app.flarmalodebop.ios` and `app.flarmalodebop.ios.meetup`.
 
 Do this once the Apple Developer Program enrollment for **Matthew Finley** (account type **Individual**) is approved. An Individual account has one Account Holder. That Apple ID is the one EAS will ask for.
 
@@ -81,14 +85,16 @@ The sender is `v2/supabase/functions/expo-push/`. Full notes are in that folder�
    - Type: Edge Function `expo-push`, POST, timeout 5000
    - Header: `x-flarm-secret` = `FLARM_WEBHOOK_SECRET`
 6. Leave the existing `flarm_push` webhook in place. The web PWA still uses it.
-7. No SQL migration. Tokens go in `public.push_subscriptions` (`endpoint` = the Expo token, `sub` = `{ "type": "expo", "token": "…" }`). Existing RLS already confines each member to their own rows.
+7. Push tokens need no extra SQL. They go in `public.push_subscriptions` (`endpoint` = the Expo token, `sub` = `{ "type": "expo", "token": "…" }`). Existing RLS already confines each member to their own rows. The calendar migration at the top of this file is separate and does not touch those rows.
 
 A notification is sent to the other person when a message is inserted and their app has not called `heartbeat()` in the last 40 seconds. Opening the app clears the badge.
 
 ## 7. What you still have to do yourself
 
 - Wait for Apple to approve the Individual enrollment, then accept the App Store Connect agreements.
-- Run `eas login`, `eas init`, `eas build -p ios --profile production`, and `eas submit` on a computer where you can enter the Apple ID password and any 2FA code. This agent cannot sign into Apple or Expo for you.
+- Run the calendar migration in Supabase (see the top of this file) before either of you opens the new build. Chat still works if you skip it; the calendar screen stays empty until the tables exist.
+- Run `eas login`, `eas init`, `eas build -p ios --profile production`, and `eas submit` on a computer where you can enter the Apple ID password and any 2FA code. This agent cannot sign into Apple or Expo for you. Let EAS enable App Groups when it asks.
+- After TestFlight installs, long-press the home screen, tap +, and add **Today’s Restaurant Meetup**. It fills in after a meetup is confirmed while the app has been opened at least once.
 - Create the `expo-push` function and the `flarm_expo_push` webhook in the Supabase dashboard (the service role key never goes in the app).
 - Share Hailey’s existing password with her yourself. It is not in git.
 - The source may be public. `eas init` on a personal Expo account does not publish extra source. Keep the service-role key, the member passwords, and the Apple credentials out of git.

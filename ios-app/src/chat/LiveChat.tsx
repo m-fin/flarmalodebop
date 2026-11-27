@@ -115,6 +115,7 @@ export function LiveChat({ me, other }: { me: Profile; other: Profile }) {
           })
           .finally(() => setPushBusy(false));
       }}
+      onOpenCalendar={() => router.push('/calendar')}
       onSignOut={() => {
         unregisterPush(me.id)
           .catch(() => {})
