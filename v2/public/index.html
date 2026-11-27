@@ -61,10 +61,12 @@ try {
       <div class="other-name" id="otherName">Hailey</div>
       <div class="status" id="status"><span class="dot"></span><span id="statusText">offline</span></div>
     </div>
+    <button class="icon-btn" id="calendarBtn" aria-label="Shared calendar">📅</button>
     <button class="icon-btn" id="photosBtn" aria-label="Photos">🖼️</button>
     <button class="icon-btn" id="searchBtn" aria-label="Search messages">🔍</button>
     <button class="icon-btn" id="menuBtn" aria-label="Settings">⋯</button>
   </header>
+  <button id="meetupBanner" class="meetup-banner hidden" type="button"></button>
 
   <main id="scroller">
     <button id="loadOlder" class="older hidden">earlier bops</button>
@@ -133,8 +135,20 @@ try {
     <button id="closeSearch" class="btn-row ghost">Close</button>
   </div>
 </div>
+<section id="calendar" class="screen hidden" aria-label="Shared calendar">
+  <header class="top">
+    <button class="icon-btn" id="calendarBack" aria-label="Back to chat">←</button>
+    <div class="who-box">
+      <div class="other-name">Our week</div>
+      <div class="status">Shifts side by side, then one tap to propose dinner or lunch</div>
+    </div>
+  </header>
+  <div id="calendarScroll" class="calendar-scroll"></div>
+</section>
 <script src="/config.js"></script>
 <script src="/logic.js"></script>
+<script src="/calendar.js"></script>
+<script src="/calendar-ui.js"></script>
 <script src="/vendor/supabase.js"></script>
 <script src="/app.js"></script>
 </body>

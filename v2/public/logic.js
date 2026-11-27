@@ -60,7 +60,9 @@
   }
 
   function canEdit(message, meId) {
-    return !!(message && message.kind === 'text' && message.sender === meId);
+    if (!message || message.kind !== 'text' || message.sender !== meId) return false;
+    if (message.meta && message.meta.flarm === 'meetup') return false;
+    return true;
   }
 
   function canUnsend(message, meId) {

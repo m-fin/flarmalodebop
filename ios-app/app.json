@@ -18,7 +18,12 @@
         "UIViewControllerBasedStatusBarAppearance": true,
         "NSCameraUsageDescription": "Flarmalodebop uses the camera so you can take a picture to send.",
         "NSPhotoLibraryUsageDescription": "Flarmalodebop uses your photos so you can send a picture.",
-        "NSMicrophoneUsageDescription": "Flarmalodebop uses the microphone so you can send voice notes."
+        "NSMicrophoneUsageDescription": "Flarmalodebop uses the microphone so you can send voice notes.",
+        "NSCalendarsUsageDescription": "Flarmalodebop adds a confirmed restaurant meetup to your calendar.",
+        "NSCalendarsWriteOnlyAccessUsageDescription": "Flarmalodebop adds a confirmed restaurant meetup to your calendar."
+      },
+      "entitlements": {
+        "com.apple.security.application-groups": ["group.app.flarmalodebop.ios"]
       }
     },
     "android": {
@@ -71,7 +76,17 @@
           "color": "#FF5E8A"
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Flarmalodebop adds a confirmed restaurant meetup to your calendar.",
+          "writeOnlyCalendarPermission": "Flarmalodebop adds a confirmed restaurant meetup to your calendar.",
+          "remindersPermission": false,
+          "writeOnlyAccess": true
+        }
+      ],
+      "@bacons/apple-targets"
     ],
     "experiments": {
       "typedRoutes": true

@@ -19,7 +19,7 @@ Replace those with your own App Store screenshots before you submit. A 6.7-inch 
 ## Point it at your Supabase project
 
 1. In the Supabase SQL editor, run [`v2/supabase/setup.sql`](v2/supabase/setup.sql). It creates the tables, forces Row Level Security, and limits the thread to invited members.
-2. If the project already ran an older copy of that file, also run [`v2/supabase/migrations/20261115060000_private_helpers_and_force_rls.sql`](v2/supabase/migrations/20261115060000_private_helpers_and_force_rls.sql).
+2. If the project already ran an older copy of that file, also run [`v2/supabase/migrations/20261115060000_private_helpers_and_force_rls.sql`](v2/supabase/migrations/20261115060000_private_helpers_and_force_rls.sql), then [`v2/supabase/migrations/20261127120000_shared_calendar_restaurant_meetups.sql`](v2/supabase/migrations/20261127120000_shared_calendar_restaurant_meetups.sql). That migration adds the shared calendar and daily restaurant meetups. It does not rewrite messages or accounts.
 3. Create the two users out of band (the dashboard, or a SQL file you do **not** commit). Their emails must match `allowed_members` in `setup.sql`. Change those emails in the SQL and in both clients before you invite anyone else.
 4. Authentication → turn **Allow new users to sign up** off.
 5. Copy [`v2/public/config.example.js`](v2/public/config.example.js) over `v2/public/config.js` and set your project URL and publishable key. Put the same two values in [`ios-app/src/lib/config.ts`](ios-app/src/lib/config.ts).

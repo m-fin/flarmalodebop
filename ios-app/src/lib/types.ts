@@ -5,6 +5,8 @@ export type MessageMeta = {
   h?: number;
   dur?: number;
   peaks?: number[];
+  flarm?: 'meetup';
+  meetup_id?: string;
 };
 
 export type ReplySnap = {

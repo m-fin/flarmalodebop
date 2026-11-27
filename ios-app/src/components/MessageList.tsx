@@ -4,6 +4,8 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { formatClock, formatDay, formatDur, isEmojiOnly, messageTime } from '@/lib/format';
 import { receiptFor } from '@/lib/goose';
+import { isMeetupMessage } from '@/lib/calendar';
+import { MeetupCard } from '@/components/MeetupCard';
 import { firstUnreadId, groupReactions, replySnippet, resolveReply } from '@/lib/thread';
 import { palette, useTheme } from '@/lib/theme';
 import type { Message, Profile, Reaction } from '@/lib/types';
@@ -33,6 +35,7 @@ type Props = {
   onLongPress: (message: Message) => void;
   onReact: (messageId: number, emoji: string) => void;
   onJump: (id: number) => void;
+  onMeetupError?: (message: string) => void;
   resolvePhoto: (path: string) => Promise<string>;
   voice: VoiceState;
   listRef: RefObject<FlatList<Message> | null>;
@@ -96,6 +99,14 @@ export function MessageList(props: Props) {
                 <View style={[styles.unreadLine, { backgroundColor: palette.sun }]} />
               </View>
             ) : null}
+            {isMeetupMessage(item) ? (
+              <MeetupCard
+                meetupId={String(item.meta?.meetup_id || '')}
+                fallback={item.body}
+                meId={props.me.id}
+                onError={props.onMeetupError || (() => {})}
+              />
+            ) : (
             <Bubble
               message={item}
               mine={item.sender === props.me.id}
@@ -119,6 +130,7 @@ export function MessageList(props: Props) {
               resolvePhoto={props.resolvePhoto}
               voice={props.voice}
             />
+            )}
           </View>
         );
       }}

@@ -9,6 +9,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { AuthProvider, useAuth } from '@/auth/AuthProvider';
+import { CalendarProvider } from '@/chat/CalendarProvider';
 import { ThemeProvider, useTheme } from '@/lib/theme';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -31,7 +32,7 @@ export default function RootLayout() {
 
 function Root() {
   const theme = useTheme();
-  const { ready } = useAuth();
+  const { ready, me } = useAuth();
   const [fontsLoaded, fontError] = useFonts({
     Fredoka_400Regular,
     Fredoka_500Medium,
@@ -57,13 +58,16 @@ function Root() {
   return (
     <View style={{ flex: 1, backgroundColor: theme.bg }}>
       <StatusBar style={theme.dark ? 'light' : 'dark'} />
+      <CalendarProvider me={me}>
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.bg }, animation: 'fade' }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="login" />
         <Stack.Screen name="chat" />
+        <Stack.Screen name="calendar" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="preview" />
         <Stack.Screen name="privacy" options={{ animation: 'slide_from_right' }} />
       </Stack>
+      </CalendarProvider>
     </View>
   );
 }

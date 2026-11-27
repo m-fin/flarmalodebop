@@ -30,6 +30,8 @@ import { avatarFor } from '@/lib/config';
 import { downsamplePeaks, formatDur, meterLevel } from '@/lib/format';
 import { hapticSelect, hapticTap } from '@/lib/haptics';
 import { sessionMode } from '@/lib/sounds';
+import { useCalendar } from '@/chat/CalendarProvider';
+import { bannerCopy } from '@/lib/calendar';
 import { draftKey, draftToStore, firstUnreadId, normalizeDraft, replySnippet } from '@/lib/thread';
 import { palette, useTheme } from '@/lib/theme';
 import type { Message, Profile, Reaction } from '@/lib/types';
@@ -85,12 +87,15 @@ type Props = {
   onCycleAppearance: () => void;
   onEnablePush: () => void;
   onSignOut: () => void;
+  onOpenCalendar?: () => void;
   resolvePhoto: (path: string) => Promise<string>;
   resolveAudio: (path: string) => Promise<AudioSource>;
 };
 
 export function ChatView(props: Props) {
   const theme = useTheme();
+  const calendar = useCalendar();
+  const meetupBanner = bannerCopy(calendar.todayMeetup);
   const insets = useSafeAreaInsets();
   const keyboardOpen = useKeyboardState((state) => state.isVisible);
   const [draft, setDraft] = useState('');
@@ -356,6 +361,11 @@ export function ChatView(props: Props) {
             <Text style={[styles.status, { color: theme.muted }]}>{props.online ? 'here now ♪' : 'away'}</Text>
           </View>
         </View>
+        {props.onOpenCalendar ? (
+          <Pressable accessibilityLabel="Shared calendar" onPress={props.onOpenCalendar} style={styles.iconBtn}>
+            <Text style={styles.icon}>📅</Text>
+          </Pressable>
+        ) : null}
         <Pressable accessibilityLabel="Photos" onPress={() => setPhotosOpen(true)} style={styles.iconBtn}>
           <Text style={styles.icon}>🖼️</Text>
         </Pressable>
@@ -366,6 +376,13 @@ export function ChatView(props: Props) {
           <Text style={[styles.icon, { color: theme.text }]}>⋯</Text>
         </Pressable>
       </BlurView>
+      {meetupBanner ? (
+        <Pressable accessibilityRole="button" onPress={props.onOpenCalendar} style={[styles.banner, { backgroundColor: theme.card }]}>
+          <Text style={styles.bannerKicker}>{meetupBanner.title}</Text>
+          <Text style={[styles.bannerDetail, { color: theme.text }]}>{meetupBanner.detail}</Text>
+          {meetupBanner.ride ? <Text style={{ color: theme.muted }}>{meetupBanner.ride}</Text> : null}
+        </Pressable>
+      ) : null}
 
       <KeyboardAvoidingView style={styles.fill} behavior="padding" automaticOffset>
         <MessageList
@@ -392,6 +409,7 @@ export function ChatView(props: Props) {
             props.onShowLatest();
           }}
           onOpenPhoto={setPhoto}
+          onMeetupError={showToast}
           onLongPress={(message) => {
             setConfirmUnsend(false);
             setActions(message);
@@ -609,6 +627,9 @@ export function ChatView(props: Props) {
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
+  banner: { marginHorizontal: 12, marginTop: 8, borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10, gap: 2 },
+  bannerKicker: { color: palette.sun, fontFamily: 'Fredoka_700Bold', fontSize: 12, letterSpacing: 0.4, textTransform: 'uppercase' },
+  bannerDetail: { fontFamily: 'Fredoka_700Bold', fontSize: 16 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingBottom: 10, overflow: 'hidden' },
   avatar: {
     width: 44,
